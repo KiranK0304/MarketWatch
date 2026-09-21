@@ -1298,13 +1298,13 @@
     // - Sub-15m candles are tighter (many bars)
     function getTimeframeChartParams(tf) {
       switch (tf) {
-        case '1d':  return { barSpacing: 10, rightOffset: 8 };
-        case '1w':  return { barSpacing: 12, rightOffset: 8 };
-        case '1h':  return { barSpacing: 8,  rightOffset: 7 };
-        case '15m': return { barSpacing: 8,  rightOffset: 7 };
-        case '30m': return { barSpacing: 8,  rightOffset: 7 };
-        case '5m':  return { barSpacing: 6,  rightOffset: 6 };
-        default:    return { barSpacing: 8,  rightOffset: 7 };
+        case '1d':  return { barSpacing: 6, rightOffset: 6 };
+        case '1w':  return { barSpacing: 8, rightOffset: 6 };
+        case '1h':  return { barSpacing: 5, rightOffset: 5 };
+        case '15m': return { barSpacing: 5, rightOffset: 5 };
+        case '30m': return { barSpacing: 5, rightOffset: 5 };
+        case '5m':  return { barSpacing: 4, rightOffset: 5 };
+        default:    return { barSpacing: 5, rightOffset: 5 };
       }
     }
 
