@@ -1352,8 +1352,8 @@
           borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
           timeVisible: true,
           secondsVisible: false,
-          rightOffset: 7,
-          barSpacing: 10,
+          rightOffset: getTimeframeChartParams(currentTimeframe).rightOffset,
+          barSpacing: getTimeframeChartParams(currentTimeframe).barSpacing,
         },
       });
 
@@ -1480,6 +1480,15 @@
       candleSeries.setData(candles);
       volumeSeries.setData(volumes);
       chart.timeScale().fitContent();
+
+      // fitContent() recalculates barSpacing to fit all bars in the viewport,
+      // which overrides our desired spacing. Re-apply timeframe-adaptive
+      // barSpacing and rightOffset AFTER fitContent so they stick.
+      const tfParams = getTimeframeChartParams(currentTimeframe);
+      chart.timeScale().applyOptions({
+        rightOffset: tfParams.rightOffset,
+        barSpacing: tfParams.barSpacing,
+      });
 
       // Force the price scale to re-auto-scale for the new data range.
       // This ensures switching between stocks with very different price ranges
