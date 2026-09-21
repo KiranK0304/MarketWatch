@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="surge" x1="12" y1="52" x2="52" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded squircle badge -->
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+  <rect x="1" y="1" width="62" height="62" rx="15" stroke="#334155" stroke-width="1.5" stroke-opacity="0.6"/>
+
+  <!-- Candlestick 1: Bearish accent (left) -->
+  <line x1="20" y1="20" x2="20" y2="44" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="16.5" y="25" width="7" height="12" rx="1.5" fill="#ef4444"/>
+
+  <!-- Candlestick 2: Bullish hero (center) -->
+  <line x1="33" y1="12" x2="33" y2="48" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="29.5" y="16" width="7" height="20" rx="1.5" fill="#22c55e"/>
+
+  <!-- Momentum Surge Line & Node (glowing) -->
+  <path d="M12 46 L26 36 L36 40 L52 14" stroke="url(#surge)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <circle cx="52" cy="14" r="3.5" fill="#38bdf8" filter="url(#glow)"/>
+  <circle cx="52" cy="14" r="1.5" fill="#ffffff"/>
+</svg>

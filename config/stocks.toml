@@ -1,0 +1,602 @@
+# Top 150 Indian Equities (Nifty 50 + Nifty Next 50 + Nifty Midcap 50)
+
+[[stocks]]
+symbol = "ADANIENT.NS"
+name = "Adani Enterprises Ltd."
+
+[[stocks]]
+symbol = "ADANIPORTS.NS"
+name = "Adani Ports and Special Economic Zone Ltd."
+
+[[stocks]]
+symbol = "APOLLOHOSP.NS"
+name = "Apollo Hospitals Enterprise Ltd."
+
+[[stocks]]
+symbol = "ASIANPAINT.NS"
+name = "Asian Paints Ltd."
+
+[[stocks]]
+symbol = "AXISBANK.NS"
+name = "Axis Bank Ltd."
+
+[[stocks]]
+symbol = "BAJAJ-AUTO.NS"
+name = "Bajaj Auto Ltd."
+
+[[stocks]]
+symbol = "BAJFINANCE.NS"
+name = "Bajaj Finance Ltd."
+
+[[stocks]]
+symbol = "BAJAJFINSV.NS"
+name = "Bajaj Finserv Ltd."
+
+[[stocks]]
+symbol = "BEL.NS"
+name = "Bharat Electronics Ltd."
+
+[[stocks]]
+symbol = "BHARTIARTL.NS"
+name = "Bharti Airtel Ltd."
+
+[[stocks]]
+symbol = "CIPLA.NS"
+name = "Cipla Ltd."
+
+[[stocks]]
+symbol = "COALINDIA.NS"
+name = "Coal India Ltd."
+
+[[stocks]]
+symbol = "DRREDDY.NS"
+name = "Dr. Reddy's Laboratories Ltd."
+
+[[stocks]]
+symbol = "EICHERMOT.NS"
+name = "Eicher Motors Ltd."
+
+[[stocks]]
+symbol = "ETERNAL.NS"
+name = "Eternal Ltd."
+
+[[stocks]]
+symbol = "GRASIM.NS"
+name = "Grasim Industries Ltd."
+
+[[stocks]]
+symbol = "HCLTECH.NS"
+name = "HCL Technologies Ltd."
+
+[[stocks]]
+symbol = "HDFCBANK.NS"
+name = "HDFC Bank Ltd."
+
+[[stocks]]
+symbol = "HDFCLIFE.NS"
+name = "HDFC Life Insurance Company Ltd."
+
+[[stocks]]
+symbol = "HINDALCO.NS"
+name = "Hindalco Industries Ltd."
+
+[[stocks]]
+symbol = "HINDUNILVR.NS"
+name = "Hindustan Unilever Ltd."
+
+[[stocks]]
+symbol = "ICICIBANK.NS"
+name = "ICICI Bank Ltd."
+
+[[stocks]]
+symbol = "ITC.NS"
+name = "ITC Ltd."
+
+[[stocks]]
+symbol = "INFY.NS"
+name = "Infosys Ltd."
+
+[[stocks]]
+symbol = "INDIGO.NS"
+name = "InterGlobe Aviation Ltd."
+
+[[stocks]]
+symbol = "JSWSTEEL.NS"
+name = "JSW Steel Ltd."
+
+[[stocks]]
+symbol = "JIOFIN.NS"
+name = "Jio Financial Services Ltd."
+
+[[stocks]]
+symbol = "KOTAKBANK.NS"
+name = "Kotak Mahindra Bank Ltd."
+
+[[stocks]]
+symbol = "LT.NS"
+name = "Larsen & Toubro Ltd."
+
+[[stocks]]
+symbol = "M&M.NS"
+name = "Mahindra & Mahindra Ltd."
+
+[[stocks]]
+symbol = "MARUTI.NS"
+name = "Maruti Suzuki India Ltd."
+
+[[stocks]]
+symbol = "MAXHEALTH.NS"
+name = "Max Healthcare Institute Ltd."
+
+[[stocks]]
+symbol = "NTPC.NS"
+name = "NTPC Ltd."
+
+[[stocks]]
+symbol = "NESTLEIND.NS"
+name = "Nestle India Ltd."
+
+[[stocks]]
+symbol = "ONGC.NS"
+name = "Oil & Natural Gas Corporation Ltd."
+
+[[stocks]]
+symbol = "POWERGRID.NS"
+name = "Power Grid Corporation of India Ltd."
+
+[[stocks]]
+symbol = "RELIANCE.NS"
+name = "Reliance Industries Ltd."
+
+[[stocks]]
+symbol = "SBILIFE.NS"
+name = "SBI Life Insurance Company Ltd."
+
+[[stocks]]
+symbol = "SHRIRAMFIN.NS"
+name = "Shriram Finance Ltd."
+
+[[stocks]]
+symbol = "SBIN.NS"
+name = "State Bank of India"
+
+[[stocks]]
+symbol = "SUNPHARMA.NS"
+name = "Sun Pharmaceutical Industries Ltd."
+
+[[stocks]]
+symbol = "TCS.NS"
+name = "Tata Consultancy Services Ltd."
+
+[[stocks]]
+symbol = "TATACONSUM.NS"
+name = "Tata Consumer Products Ltd."
+
+[[stocks]]
+symbol = "TMPV.NS"
+name = "Tata Motors Passenger Vehicles Ltd."
+
+[[stocks]]
+symbol = "TATASTEEL.NS"
+name = "Tata Steel Ltd."
+
+[[stocks]]
+symbol = "TECHM.NS"
+name = "Tech Mahindra Ltd."
+
+[[stocks]]
+symbol = "TITAN.NS"
+name = "Titan Company Ltd."
+
+[[stocks]]
+symbol = "TRENT.NS"
+name = "Trent Ltd."
+
+[[stocks]]
+symbol = "ULTRACEMCO.NS"
+name = "UltraTech Cement Ltd."
+
+[[stocks]]
+symbol = "WIPRO.NS"
+name = "Wipro Ltd."
+
+[[stocks]]
+symbol = "ABB.NS"
+name = "ABB India Ltd."
+
+[[stocks]]
+symbol = "ADANIENSOL.NS"
+name = "Adani Energy Solutions Ltd."
+
+[[stocks]]
+symbol = "ADANIGREEN.NS"
+name = "Adani Green Energy Ltd."
+
+[[stocks]]
+symbol = "ADANIPOWER.NS"
+name = "Adani Power Ltd."
+
+[[stocks]]
+symbol = "AMBUJACEM.NS"
+name = "Ambuja Cements Ltd."
+
+[[stocks]]
+symbol = "DMART.NS"
+name = "Avenue Supermarts Ltd."
+
+[[stocks]]
+symbol = "BAJAJHLDNG.NS"
+name = "Bajaj Holdings & Investment Ltd."
+
+[[stocks]]
+symbol = "BANKBARODA.NS"
+name = "Bank of Baroda"
+
+[[stocks]]
+symbol = "BPCL.NS"
+name = "Bharat Petroleum Corporation Ltd."
+
+[[stocks]]
+symbol = "BOSCHLTD.NS"
+name = "Bosch Ltd."
+
+[[stocks]]
+symbol = "BRITANNIA.NS"
+name = "Britannia Industries Ltd."
+
+[[stocks]]
+symbol = "CGPOWER.NS"
+name = "CG Power and Industrial Solutions Ltd."
+
+[[stocks]]
+symbol = "CANBK.NS"
+name = "Canara Bank"
+
+[[stocks]]
+symbol = "CHOLAFIN.NS"
+name = "Cholamandalam Investment and Finance Company Ltd."
+
+[[stocks]]
+symbol = "CUMMINSIND.NS"
+name = "Cummins India Ltd."
+
+[[stocks]]
+symbol = "DLF.NS"
+name = "DLF Ltd."
+
+[[stocks]]
+symbol = "DIVISLAB.NS"
+name = "Divi's Laboratories Ltd."
+
+[[stocks]]
+symbol = "GAIL.NS"
+name = "GAIL (India) Ltd."
+
+[[stocks]]
+symbol = "GODREJCP.NS"
+name = "Godrej Consumer Products Ltd."
+
+[[stocks]]
+symbol = "HDFCAMC.NS"
+name = "HDFC Asset Management Company Ltd."
+
+[[stocks]]
+symbol = "HAL.NS"
+name = "Hindustan Aeronautics Ltd."
+
+[[stocks]]
+symbol = "HINDZINC.NS"
+name = "Hindustan Zinc Ltd."
+
+[[stocks]]
+symbol = "HYUNDAI.NS"
+name = "Hyundai Motor India Ltd."
+
+[[stocks]]
+symbol = "INDHOTEL.NS"
+name = "Indian Hotels Co. Ltd."
+
+[[stocks]]
+symbol = "IOC.NS"
+name = "Indian Oil Corporation Ltd."
+
+[[stocks]]
+symbol = "IRFC.NS"
+name = "Indian Railway Finance Corporation Ltd."
+
+[[stocks]]
+symbol = "JINDALSTEL.NS"
+name = "Jindal Steel Ltd."
+
+[[stocks]]
+symbol = "LTM.NS"
+name = "LTM Ltd."
+
+[[stocks]]
+symbol = "LODHA.NS"
+name = "Lodha Developers Ltd."
+
+[[stocks]]
+symbol = "MAZDOCK.NS"
+name = "Mazagoan Dock Shipbuilders Ltd."
+
+[[stocks]]
+symbol = "MUTHOOTFIN.NS"
+name = "Muthoot Finance Ltd."
+
+[[stocks]]
+symbol = "PIDILITIND.NS"
+name = "Pidilite Industries Ltd."
+
+[[stocks]]
+symbol = "PFC.NS"
+name = "Power Finance Corporation Ltd."
+
+[[stocks]]
+symbol = "PNB.NS"
+name = "Punjab National Bank"
+
+[[stocks]]
+symbol = "RECLTD.NS"
+name = "REC Ltd."
+
+[[stocks]]
+symbol = "MOTHERSON.NS"
+name = "Samvardhana Motherson International Ltd."
+
+[[stocks]]
+symbol = "SHREECEM.NS"
+name = "Shree Cement Ltd."
+
+[[stocks]]
+symbol = "ENRIN.NS"
+name = "Siemens Energy India Ltd."
+
+[[stocks]]
+symbol = "SIEMENS.NS"
+name = "Siemens Ltd."
+
+[[stocks]]
+symbol = "SOLARINDS.NS"
+name = "Solar Industries India Ltd."
+
+[[stocks]]
+symbol = "TVSMOTOR.NS"
+name = "TVS Motor Company Ltd."
+
+[[stocks]]
+symbol = "TATACAP.NS"
+name = "Tata Capital Ltd."
+
+[[stocks]]
+symbol = "TMCV.NS"
+name = "Tata Motors Ltd."
+
+[[stocks]]
+symbol = "TATAPOWER.NS"
+name = "Tata Power Co. Ltd."
+
+[[stocks]]
+symbol = "TORNTPHARM.NS"
+name = "Torrent Pharmaceuticals Ltd."
+
+[[stocks]]
+symbol = "UNIONBANK.NS"
+name = "Union Bank of India"
+
+[[stocks]]
+symbol = "UNITDSPR.NS"
+name = "United Spirits Ltd."
+
+[[stocks]]
+symbol = "VBL.NS"
+name = "Varun Beverages Ltd."
+
+[[stocks]]
+symbol = "VEDL.NS"
+name = "Vedanta Ltd."
+
+[[stocks]]
+symbol = "ZYDUSLIFE.NS"
+name = "Zydus Lifesciences Ltd."
+
+[[stocks]]
+symbol = "APLAPOLLO.NS"
+name = "APL Apollo Tubes Ltd."
+
+[[stocks]]
+symbol = "AUBANK.NS"
+name = "AU Small Finance Bank Ltd."
+
+[[stocks]]
+symbol = "ALKEM.NS"
+name = "Alkem Laboratories Ltd."
+
+[[stocks]]
+symbol = "ASHOKLEY.NS"
+name = "Ashok Leyland Ltd."
+
+[[stocks]]
+symbol = "AUROPHARMA.NS"
+name = "Aurobindo Pharma Ltd."
+
+[[stocks]]
+symbol = "BSE.NS"
+name = "BSE Ltd."
+
+[[stocks]]
+symbol = "BHARATFORG.NS"
+name = "Bharat Forge Ltd."
+
+[[stocks]]
+symbol = "BHEL.NS"
+name = "Bharat Heavy Electricals Ltd."
+
+[[stocks]]
+symbol = "COFORGE.NS"
+name = "Coforge Ltd."
+
+[[stocks]]
+symbol = "COLPAL.NS"
+name = "Colgate Palmolive (India) Ltd."
+
+[[stocks]]
+symbol = "DABUR.NS"
+name = "Dabur India Ltd."
+
+[[stocks]]
+symbol = "DIXON.NS"
+name = "Dixon Technologies (India) Ltd."
+
+[[stocks]]
+symbol = "NYKAA.NS"
+name = "FSN E-Commerce Ventures Ltd."
+
+[[stocks]]
+symbol = "FEDERALBNK.NS"
+name = "Federal Bank Ltd."
+
+[[stocks]]
+symbol = "FORTIS.NS"
+name = "Fortis Healthcare Ltd."
+
+[[stocks]]
+symbol = "GMRAIRPORT.NS"
+name = "GMR Airports Ltd."
+
+[[stocks]]
+symbol = "GODREJPROP.NS"
+name = "Godrej Properties Ltd."
+
+[[stocks]]
+symbol = "HAVELLS.NS"
+name = "Havells India Ltd."
+
+[[stocks]]
+symbol = "HEROMOTOCO.NS"
+name = "Hero MotoCorp Ltd."
+
+[[stocks]]
+symbol = "HINDPETRO.NS"
+name = "Hindustan Petroleum Corporation Ltd."
+
+[[stocks]]
+symbol = "ICICIGI.NS"
+name = "ICICI Lombard General Insurance Company Ltd."
+
+[[stocks]]
+symbol = "IDFCFIRSTB.NS"
+name = "IDFC First Bank Ltd."
+
+[[stocks]]
+symbol = "INDUSTOWER.NS"
+name = "Indus Towers Ltd."
+
+[[stocks]]
+symbol = "INDUSINDBK.NS"
+name = "IndusInd Bank Ltd."
+
+[[stocks]]
+symbol = "NAUKRI.NS"
+name = "Info Edge (India) Ltd."
+
+[[stocks]]
+symbol = "LAURUSLABS.NS"
+name = "Laurus Labs Ltd."
+
+[[stocks]]
+symbol = "LUPIN.NS"
+name = "Lupin Ltd."
+
+[[stocks]]
+symbol = "MANKIND.NS"
+name = "Mankind Pharma Ltd."
+
+[[stocks]]
+symbol = "MARICO.NS"
+name = "Marico Ltd."
+
+[[stocks]]
+symbol = "MFSL.NS"
+name = "Max Financial Services Ltd."
+
+[[stocks]]
+symbol = "MPHASIS.NS"
+name = "MphasiS Ltd."
+
+[[stocks]]
+symbol = "MCX.NS"
+name = "Multi Commodity Exchange of India Ltd."
+
+[[stocks]]
+symbol = "NHPC.NS"
+name = "NHPC Ltd."
+
+[[stocks]]
+symbol = "NMDC.NS"
+name = "NMDC Ltd."
+
+[[stocks]]
+symbol = "OIL.NS"
+name = "Oil India Ltd."
+
+[[stocks]]
+symbol = "PAYTM.NS"
+name = "One 97 Communications Ltd."
+
+[[stocks]]
+symbol = "POLICYBZR.NS"
+name = "PB Fintech Ltd."
+
+[[stocks]]
+symbol = "PERSISTENT.NS"
+name = "Persistent Systems Ltd."
+
+[[stocks]]
+symbol = "PHOENIXLTD.NS"
+name = "Phoenix Mills Ltd."
+
+[[stocks]]
+symbol = "POLYCAB.NS"
+name = "Polycab India Ltd."
+
+[[stocks]]
+symbol = "PRESTIGE.NS"
+name = "Prestige Estates Projects Ltd."
+
+[[stocks]]
+symbol = "SBICARD.NS"
+name = "SBI Cards and Payment Services Ltd."
+
+[[stocks]]
+symbol = "SRF.NS"
+name = "SRF Ltd."
+
+[[stocks]]
+symbol = "SUPREMEIND.NS"
+name = "Supreme Industries Ltd."
+
+[[stocks]]
+symbol = "SUZLON.NS"
+name = "Suzlon Energy Ltd."
+
+[[stocks]]
+symbol = "SWIGGY.NS"
+name = "Swiggy Ltd."
+
+[[stocks]]
+symbol = "TIINDIA.NS"
+name = "Tube Investments of India Ltd."
+
+[[stocks]]
+symbol = "UPL.NS"
+name = "UPL Ltd."
+
+[[stocks]]
+symbol = "WAAREEENER.NS"
+name = "Waaree Energies Ltd."
+
+[[stocks]]
+symbol = "YESBANK.NS"
+name = "Yes Bank Ltd."
+
