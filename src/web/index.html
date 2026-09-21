@@ -1175,6 +1175,7 @@
         <div class="ohlc-val">H: <span id="val-high">--</span></div>
         <div class="ohlc-val">L: <span id="val-low">--</span></div>
         <div class="ohlc-val">C: <span id="val-close">--</span></div>
+        <div class="ohlc-val">Chg: <span id="val-chg">--</span></div>
         <div class="ohlc-val">Vol: <span id="val-vol">--</span></div>
       </div>
 
@@ -1393,7 +1394,27 @@
           document.getElementById('val-high').textContent = formatPrice(data.high);
           document.getElementById('val-low').textContent = formatPrice(data.low);
           document.getElementById('val-close').textContent = formatPrice(data.close);
+
+          // Candle change and percentage change (broker style)
+          const candleDiff = data.close - data.open;
+          const candlePct = data.open > 0 ? (candleDiff / data.open) * 100 : 0;
+          const isUp = candleDiff >= 0;
+          const chgSign = isUp ? '+' : '';
+          const chgEl = document.getElementById('val-chg');
+          if (chgEl) {
+            chgEl.textContent = `${chgSign}${formatPrice(candleDiff)} (${chgSign}${candlePct.toFixed(2)}%)`;
+            chgEl.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
+          }
+
           document.getElementById('val-vol').textContent = volData ? formatVol(volData.value) : '--';
+
+          // Also dynamically update the top header price and change badge to reflect hovered candle
+          document.getElementById('hdr-price').textContent = '₹' + formatPrice(data.close);
+          const hdrChgEl = document.getElementById('hdr-change');
+          if (hdrChgEl) {
+            hdrChgEl.textContent = `${chgSign}${formatPrice(candleDiff)} (${chgSign}${candlePct.toFixed(2)}%)`;
+            hdrChgEl.className = 'price-change ' + (isUp ? 'up' : 'down');
+          }
         }
       });
 
@@ -1425,6 +1446,18 @@
       document.getElementById('val-high').textContent = formatPrice(last.high);
       document.getElementById('val-low').textContent = formatPrice(last.low);
       document.getElementById('val-close').textContent = formatPrice(last.close);
+
+      // Latest candle change
+      const candleDiff = last.close - last.open;
+      const candlePct = last.open > 0 ? (candleDiff / last.open) * 100 : 0;
+      const isUp = candleDiff >= 0;
+      const chgSign = isUp ? '+' : '';
+      const valChgEl = document.getElementById('val-chg');
+      if (valChgEl) {
+        valChgEl.textContent = `${chgSign}${formatPrice(candleDiff)} (${chgSign}${candlePct.toFixed(2)}%)`;
+        valChgEl.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
+      }
+
       document.getElementById('val-vol').textContent = formatVol(last.volume);
     }
 
@@ -1893,6 +1926,36 @@
               miniChart.priceScale('right').applyOptions({
                 autoScale: true,
                 scaleMargins: { top: 0.05, bottom: 0.15 },
+              });
+
+              // Crosshair hover on mini chart updates card price & percentage change
+              const origPrice = mover.price;
+              const origPct = mover.change_percent;
+              const priceEl = card.querySelector('.grid-chart-price');
+              const badgeEl = card.querySelector('.stock-badge');
+
+              miniChart.subscribeCrosshairMove(param => {
+                if (!param || !param.time || !param.seriesData.get(series)) {
+                  if (priceEl) priceEl.textContent = '₹' + formatPrice(origPrice);
+                  if (badgeEl) {
+                    const isUp = origPct >= 0;
+                    const sign = isUp ? '+' : '';
+                    badgeEl.textContent = `${sign}${origPct.toFixed(2)}%`;
+                    badgeEl.className = `stock-badge ${isUp ? 'up' : 'down'}`;
+                  }
+                  return;
+                }
+
+                const c = param.seriesData.get(series);
+                if (c && priceEl && badgeEl) {
+                  const cDiff = c.close - c.open;
+                  const cPct = c.open > 0 ? (cDiff / c.open) * 100 : 0;
+                  const isUp = cDiff >= 0;
+                  const sign = isUp ? '+' : '';
+                  priceEl.textContent = '₹' + formatPrice(c.close);
+                  badgeEl.textContent = `${sign}${formatPrice(cDiff)} (${sign}${cPct.toFixed(2)}%)`;
+                  badgeEl.className = `stock-badge ${isUp ? 'up' : 'down'}`;
+                }
               });
             }
           })
