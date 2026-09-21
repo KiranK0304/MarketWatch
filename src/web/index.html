@@ -1325,6 +1325,11 @@
         },
         rightPriceScale: {
           borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
+          autoScale: true,
+          scaleMargins: {
+            top: 0.05,
+            bottom: 0.2,
+          },
         },
         timeScale: {
           borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
@@ -1456,6 +1461,18 @@
       candleSeries.setData(candles);
       volumeSeries.setData(volumes);
       chart.timeScale().fitContent();
+
+      // Force the price scale to re-auto-scale for the new data range.
+      // This ensures switching between stocks with very different price ranges
+      // (e.g., ₹19,000 vs ₹560) always frames the candlesticks optimally
+      // without requiring manual scrolling or pinching — like professional brokers.
+      chart.priceScale('right').applyOptions({
+        autoScale: true,
+        scaleMargins: {
+          top: 0.05,
+          bottom: 0.2,
+        },
+      });
 
       let hi = -Infinity, lo = Infinity, totalVol = 0;
       data.forEach(c => {
@@ -1800,6 +1817,11 @@
           },
           rightPriceScale: {
             borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
+            autoScale: true,
+            scaleMargins: {
+              top: 0.05,
+              bottom: 0.15,
+            },
           },
           timeScale: {
             borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
@@ -1832,6 +1854,11 @@
               }));
               series.setData(candles);
               miniChart.timeScale().fitContent();
+              // Force price axis re-fit for each mini chart
+              miniChart.priceScale('right').applyOptions({
+                autoScale: true,
+                scaleMargins: { top: 0.05, bottom: 0.15 },
+              });
             }
           })
           .catch(err => console.warn(`Failed candles for ${mover.symbol}:`, err));
