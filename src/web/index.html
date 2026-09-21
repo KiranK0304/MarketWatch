@@ -1298,13 +1298,13 @@
     // - Sub-15m candles are tighter (many bars)
     function getTimeframeChartParams(tf) {
       switch (tf) {
-        case '1d':  return { barSpacing: 6, rightOffset: 6 };
-        case '1w':  return { barSpacing: 8, rightOffset: 6 };
-        case '1h':  return { barSpacing: 5, rightOffset: 5 };
-        case '15m': return { barSpacing: 5, rightOffset: 5 };
-        case '30m': return { barSpacing: 5, rightOffset: 5 };
-        case '5m':  return { barSpacing: 4, rightOffset: 5 };
-        default:    return { barSpacing: 5, rightOffset: 5 };
+        case '1d':  return { barSpacing: 3, minBarSpacing: 1, rightOffset: 5 };
+        case '1w':  return { barSpacing: 4, minBarSpacing: 1, rightOffset: 5 };
+        case '1h':  return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
+        case '15m': return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
+        case '30m': return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
+        case '5m':  return { barSpacing: 2.5, minBarSpacing: 1, rightOffset: 4 };
+        default:    return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
       }
     }
 
@@ -1569,6 +1569,7 @@
       chart.timeScale().applyOptions({
         rightOffset: tfParams.rightOffset,
         barSpacing: tfParams.barSpacing,
+        minBarSpacing: tfParams.minBarSpacing,
       });
 
       // Force the price scale to re-auto-scale for the new data range.
