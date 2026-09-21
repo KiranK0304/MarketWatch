@@ -1855,8 +1855,8 @@
             borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
             timeVisible: true,
             secondsVisible: false,
-            rightOffset: 4,
-            barSpacing: 8,
+            rightOffset: Math.max(3, getTimeframeChartParams(currentTimeframe).rightOffset - 3),
+            barSpacing: Math.max(6, getTimeframeChartParams(currentTimeframe).barSpacing - 2),
           },
         });
 
@@ -1884,6 +1884,11 @@
               }));
               series.setData(candles);
               miniChart.timeScale().fitContent();
+              // Re-apply spacing after fitContent (same fix as main chart)
+              miniChart.timeScale().applyOptions({
+                rightOffset: Math.max(3, getTimeframeChartParams(currentTimeframe).rightOffset - 3),
+                barSpacing: Math.max(6, getTimeframeChartParams(currentTimeframe).barSpacing - 2),
+              });
               // Force price axis re-fit for each mini chart
               miniChart.priceScale('right').applyOptions({
                 autoScale: true,
