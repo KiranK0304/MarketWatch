@@ -1,8 +1,8 @@
 //! Persistence and state tracking for scheduled scans and automatic catch-up.
 
-use std::path::{Path, PathBuf};
-use chrono::{Datelike, DateTime, FixedOffset, Timelike};
+use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 use crate::domain::ScanResult;
 use crate::error::MarketError;
@@ -60,14 +60,23 @@ impl ScanState {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| MarketError::Config(format!("Failed to serialize scan state: {e}")))?;
 
-        std::fs::write(path, json)
-            .map_err(|e| MarketError::Config(format!("Failed to write state to '{}': {e}", path.display())))?;
+        std::fs::write(path, json).map_err(|e| {
+            MarketError::Config(format!(
+                "Failed to write state to '{}': {e}",
+                path.display()
+            ))
+        })?;
 
         Ok(())
     }
 
     /// Record completion of a scheduled slot.
-    pub fn record_slot_completion(&mut self, slot: ScheduledSlot, date_str: &str, result: ScanResult) {
+    pub fn record_slot_completion(
+        &mut self,
+        slot: ScheduledSlot,
+        date_str: &str,
+        result: ScanResult,
+    ) {
         match slot {
             ScheduledSlot::Morning => self.last_morning_scan_date = Some(date_str.to_string()),
             ScheduledSlot::Evening => self.last_evening_scan_date = Some(date_str.to_string()),
@@ -159,7 +168,10 @@ mod tests {
 
         // Monday at 10:15 AM (after 09:30 morning slot)
         let monday_10_15 = ist.with_ymd_and_hms(2026, 9, 21, 10, 15, 0).unwrap();
-        assert_eq!(state.determine_pending_slot(monday_10_15), Some(ScheduledSlot::Morning));
+        assert_eq!(
+            state.determine_pending_slot(monday_10_15),
+            Some(ScheduledSlot::Morning)
+        );
 
         // Mark morning scan as completed
         state.last_morning_scan_date = Some("2026-09-21".to_string());
@@ -168,7 +180,10 @@ mod tests {
 
         // Monday at 16:00 (after 15:30 evening slot)
         let monday_16_00 = ist.with_ymd_and_hms(2026, 9, 21, 16, 0, 0).unwrap();
-        assert_eq!(state.determine_pending_slot(monday_16_00), Some(ScheduledSlot::Evening));
+        assert_eq!(
+            state.determine_pending_slot(monday_16_00),
+            Some(ScheduledSlot::Evening)
+        );
 
         let both_missed = ScanState::default();
         assert_eq!(

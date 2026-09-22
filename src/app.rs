@@ -11,8 +11,7 @@ use crate::domain::Timeframe;
 use crate::provider::MarketDataProvider;
 use crate::provider::yahoo::YahooProvider;
 use crate::scanner::{
-    now_ist, send_desktop_notification, show_popup_dialog, ScanState, Scanner,
-    ServiceManager,
+    ScanState, Scanner, ServiceManager, now_ist, send_desktop_notification, show_popup_dialog,
 };
 use crate::ui::chart;
 
@@ -49,7 +48,12 @@ pub async fn run(timeframe: Timeframe, symbol_arg: Option<&str>) -> anyhow::Resu
 }
 
 /// Run scanner across stock universe.
-pub async fn run_scan(threshold: f64, notify: bool, catchup: bool, popup: bool) -> anyhow::Result<()> {
+pub async fn run_scan(
+    threshold: f64,
+    notify: bool,
+    catchup: bool,
+    popup: bool,
+) -> anyhow::Result<()> {
     let state_path = ScanState::default_path();
     let mut state = ScanState::load(&state_path);
     let ist_now = now_ist();
@@ -213,7 +217,9 @@ pub fn run_service(action: &str, threshold: f64) -> anyhow::Result<()> {
             ServiceManager::status();
             Ok(())
         }
-        other => anyhow::bail!("Unknown service action '{other}'. Valid actions: install, uninstall, status."),
+        other => anyhow::bail!(
+            "Unknown service action '{other}'. Valid actions: install, uninstall, status."
+        ),
     }
 }
 

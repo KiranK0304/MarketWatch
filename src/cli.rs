@@ -22,14 +22,9 @@ pub enum RunMode {
         popup: bool,
     },
     /// Manage automated systemd user service & timer
-    Service {
-        action: String,
-        threshold: f64,
-    },
+    Service { action: String, threshold: f64 },
     /// Run background scanner daemon
-    Daemon {
-        threshold: f64,
-    },
+    Daemon { threshold: f64 },
 }
 
 /// Subcommands for the market CLI.
@@ -109,7 +104,12 @@ impl Cli {
     pub fn resolve_mode(&self) -> anyhow::Result<RunMode> {
         if let Some(ref cmd) = self.command {
             return match cmd {
-                Commands::Scan { threshold, notify, catchup, popup } => Ok(RunMode::Scan {
+                Commands::Scan {
+                    threshold,
+                    notify,
+                    catchup,
+                    popup,
+                } => Ok(RunMode::Scan {
                     threshold: *threshold,
                     notify: *notify,
                     catchup: *catchup,
@@ -275,7 +275,14 @@ mod tests {
 
     #[test]
     fn parse_scan_subcommand() {
-        let cli = Cli::parse_from(["market", "scan", "--threshold", "2.5", "--notify", "--catchup"]);
+        let cli = Cli::parse_from([
+            "market",
+            "scan",
+            "--threshold",
+            "2.5",
+            "--notify",
+            "--catchup",
+        ]);
         let mode = cli.resolve_mode().unwrap();
         assert_eq!(
             mode,

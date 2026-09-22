@@ -158,9 +158,13 @@ X-GNOME-Autostart-enabled=true
         }
 
         println!("✓ Enabled and started systemd user timer: marketwatch-scanner.timer");
-        println!("✓ Enabled and started background web server: marketwatch-web.service (localhost:3000)");
+        println!(
+            "✓ Enabled and started background web server: marketwatch-web.service (localhost:3000)"
+        );
         println!("  Schedule: Mon-Fri at 09:30 AM and 03:30 PM IST");
-        println!("  Persistent=true: If laptop is closed/off, scans catch up instantly when turned on!");
+        println!(
+            "  Persistent=true: If laptop is closed/off, scans catch up instantly when turned on!"
+        );
         println!("  Clicking the notification will directly open http://localhost:3000!");
 
         Ok(())
@@ -202,7 +206,12 @@ X-GNOME-Autostart-enabled=true
     pub fn status() {
         println!("\n=== MarketWatch Scheduled Timer ===");
         let _ = Command::new("systemctl")
-            .args(["--user", "status", "marketwatch-scanner.timer", "--no-pager"])
+            .args([
+                "--user",
+                "status",
+                "marketwatch-scanner.timer",
+                "--no-pager",
+            ])
             .status();
 
         println!("\n=== MarketWatch Web Server (localhost:3000) ===");

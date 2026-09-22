@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{delete, get};
 use axum::{Json, Router};
@@ -68,10 +68,7 @@ async fn serve_index() -> impl IntoResponse {
 
 /// Serve the favicon.
 async fn serve_favicon() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "image/svg+xml")],
-        FAVICON_SVG,
-    )
+    ([(header::CONTENT_TYPE, "image/svg+xml")], FAVICON_SVG)
 }
 
 /// Get all stocks in the universe.
@@ -219,77 +216,134 @@ async fn get_candles(
 
     // 1. Check if SQLite cache is already fresh (60s TTL during market hours, or market closed)
     if !force {
-        let fresh = state.db.is_fresh(&params.symbol, tf_label, 60).map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse { error: e.to_string() }),
-            )
-        })?;
-        if fresh {
-            let cached = state.db.get_candles(&params.symbol, tf_label).map_err(|e| {
+        let fresh = state
+            .db
+            .is_fresh(&params.symbol, tf_label, 60)
+            .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse { error: e.to_string() }),
+                    Json(ErrorResponse {
+                        error: e.to_string(),
+                    }),
                 )
             })?;
+        if fresh {
+            let cached = state
+                .db
+                .get_candles(&params.symbol, tf_label)
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: e.to_string(),
+                        }),
+                    )
+                })?;
             if !cached.is_empty() {
-                println!("[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)", params.symbol, tf_label, cached.len());
+                println!(
+                    "[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)",
+                    params.symbol,
+                    tf_label,
+                    cached.len()
+                );
                 return Ok((
                     [(header::HeaderName::from_static("x-cache"), "HIT")],
                     Json(cached),
-                ).into_response());
+                )
+                    .into_response());
             }
         }
     }
 
     if force {
-        println!("[FORCE REFRESH] {} ({}) -> bypassing cache, fetching from Yahoo Finance API...", params.symbol, tf_label);
+        println!(
+            "[FORCE REFRESH] {} ({}) -> bypassing cache, fetching from Yahoo Finance API...",
+            params.symbol, tf_label
+        );
     } else {
-        println!("[CACHE MISS] {} ({}) -> cache stale or empty, fetching from Yahoo Finance API...", params.symbol, tf_label);
+        println!(
+            "[CACHE MISS] {} ({}) -> cache stale or empty, fetching from Yahoo Finance API...",
+            params.symbol, tf_label
+        );
     }
 
     // 2. Otherwise fetch from Yahoo Provider
-    match state.provider.fetch_candles(&params.symbol, timeframe).await {
+    match state
+        .provider
+        .fetch_candles(&params.symbol, timeframe)
+        .await
+    {
         Ok(candles) => {
             let now = chrono::Utc::now().timestamp();
             // Cache in SQLite with upsert
-            state.db.save_candles(&params.symbol, tf_label, &candles, now).map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse { error: e.to_string() }),
-                )
-            })?;
-            println!("[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite", params.symbol, tf_label, candles.len());
+            state
+                .db
+                .save_candles(&params.symbol, tf_label, &candles, now)
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: e.to_string(),
+                        }),
+                    )
+                })?;
+            println!(
+                "[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite",
+                params.symbol,
+                tf_label,
+                candles.len()
+            );
 
             // Return full accumulated historical candles from DB
-            let all_candles = state.db.get_candles(&params.symbol, tf_label).map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse { error: e.to_string() }),
-                )
-            })?;
-            let result_candles = if all_candles.is_empty() { candles } else { all_candles };
+            let all_candles = state
+                .db
+                .get_candles(&params.symbol, tf_label)
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: e.to_string(),
+                        }),
+                    )
+                })?;
+            let result_candles = if all_candles.is_empty() {
+                candles
+            } else {
+                all_candles
+            };
 
             Ok((
                 [(header::HeaderName::from_static("x-cache"), "MISS")],
                 Json(result_candles),
-            ).into_response())
+            )
+                .into_response())
         }
         Err(e) => {
             // Graceful fallback: If network request failed or rate-limited,
             // return any cached candles we already have in SQLite
-            let cached = state.db.get_candles(&params.symbol, tf_label).map_err(|db_error| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse { error: db_error.to_string() }),
-                )
-            })?;
+            let cached = state
+                .db
+                .get_candles(&params.symbol, tf_label)
+                .map_err(|db_error| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: db_error.to_string(),
+                        }),
+                    )
+                })?;
             if !cached.is_empty() {
-                println!("[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite", params.symbol, tf_label, cached.len());
+                println!(
+                    "[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite",
+                    params.symbol,
+                    tf_label,
+                    cached.len()
+                );
                 return Ok((
                     [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
                     Json(cached),
-                ).into_response());
+                )
+                    .into_response());
             }
             Err((
                 StatusCode::BAD_GATEWAY,
@@ -357,17 +411,14 @@ async fn scan_movers(
     })?;
 
     let scanner = Scanner::new(state.provider.clone());
-    let result = scanner
-        .scan(&config.stocks, threshold)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: e.to_string(),
-                }),
-            )
-        })?;
+    let result = scanner.scan(&config.stocks, threshold).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
 
     scan_state.last_scan_result = Some(result.clone());
     let _ = scan_state.save(&state_path);

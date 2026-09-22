@@ -32,8 +32,12 @@ impl YahooProvider {
     /// Fetch latest market quote and price change for a stock mover.
     pub async fn fetch_mover(&self, symbol: &str, name: &str) -> Result<StockMover, MarketError> {
         let endpoints = [
-            format!("https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"),
-            format!("https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"),
+            format!(
+                "https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
+            ),
+            format!(
+                "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
+            ),
         ];
 
         let mut last_error = None;

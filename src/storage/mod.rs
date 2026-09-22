@@ -3,10 +3,10 @@
 //! Provides fast in-process querying (< 0.2ms) and market-aware cache freshness checks
 //! for Indian Stock Exchanges (NSE/BSE, UTC+5:30).
 
+use chrono::{DateTime, Datelike, FixedOffset, Timelike, Utc};
+use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use chrono::{DateTime, Datelike, FixedOffset, Timelike, Utc};
-use rusqlite::{params, Connection};
 
 use serde::{Deserialize, Serialize};
 
@@ -114,7 +114,10 @@ impl MarketDb {
 
     /// Retrieve all cached candles for a given symbol and timeframe in ascending order.
     pub fn get_candles(&self, symbol: &str, timeframe: &str) -> Result<Vec<Candle>, MarketError> {
-        let conn = self.conn.lock().map_err(|e| MarketError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
         let mut stmt = conn.prepare_cached(
             "SELECT timestamp, open, high, low, close, volume 
              FROM candles 
@@ -163,7 +166,10 @@ impl MarketDb {
             return Ok(());
         }
 
-        let mut conn = self.conn.lock().map_err(|e| MarketError::Database(e.to_string()))?;
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
         let tx = conn.transaction()?;
 
         {
@@ -223,7 +229,10 @@ impl MarketDb {
         symbol: &str,
         timeframe: &str,
     ) -> Result<Option<CacheSyncMeta>, MarketError> {
-        let conn = self.conn.lock().map_err(|e| MarketError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
         let mut stmt = conn.prepare_cached(
             "SELECT last_synced_at, first_candle_ts, last_candle_ts, candle_count 
              FROM cache_sync_meta 
@@ -283,7 +292,8 @@ impl MarketDb {
         const OPEN_MINUTES: u32 = 9 * 60 + 15; // 09:15 AM IST
         const CLOSE_MINUTES: u32 = 15 * 60 + 30; // 03:30 PM IST
 
-        let is_market_open = is_trading_day && current_minutes >= OPEN_MINUTES && current_minutes < CLOSE_MINUTES;
+        let is_market_open =
+            is_trading_day && current_minutes >= OPEN_MINUTES && current_minutes < CLOSE_MINUTES;
 
         if is_market_open {
             // During market hours, check TTL window
@@ -330,10 +340,8 @@ fn get_last_market_close_epoch(now_ist: DateTime<FixedOffset>) -> i64 {
         .expect("Valid 15:30 time");
 
     let ist_offset = *now_ist.offset();
-    let close_datetime = DateTime::<FixedOffset>::from_naive_utc_and_offset(
-        target_close - ist_offset,
-        ist_offset,
-    );
+    let close_datetime =
+        DateTime::<FixedOffset>::from_naive_utc_and_offset(target_close - ist_offset, ist_offset);
 
     close_datetime.timestamp()
 }

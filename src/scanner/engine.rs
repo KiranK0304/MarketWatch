@@ -26,7 +26,11 @@ impl Scanner {
     }
 
     /// Scan the stock universe and filter movers meeting or exceeding `threshold_percent`.
-    pub async fn scan(&self, stocks: &[StockEntry], threshold_percent: f64) -> Result<ScanResult, MarketError> {
+    pub async fn scan(
+        &self,
+        stocks: &[StockEntry],
+        threshold_percent: f64,
+    ) -> Result<ScanResult, MarketError> {
         let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS));
         let mut handles = Vec::with_capacity(stocks.len());
 
