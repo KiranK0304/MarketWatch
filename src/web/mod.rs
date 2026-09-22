@@ -18,6 +18,7 @@ use crate::domain::{ScanResult, StockMover, Timeframe};
 use crate::provider::MarketDataProvider;
 use crate::provider::yahoo::YahooProvider;
 use crate::scanner::{ScanState, Scanner};
+use crate::storage::{CacheSyncMeta, MarketDb};
 
 /// Embedded single-page dashboard HTML/CSS/JS.
 const DASHBOARD_HTML: &str = include_str!("index.html");
@@ -30,12 +31,14 @@ const FAVICON_SVG: &str = include_str!("favicon.svg");
 pub struct WebState {
     pub config_path: PathBuf,
     pub provider: Arc<YahooProvider>,
+    pub db: MarketDb,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CandlesQuery {
     pub symbol: String,
     pub timeframe: String,
+    pub force: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -193,7 +196,7 @@ async fn delete_stock(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Fetch normalized candle data for a symbol and timeframe.
+/// Fetch normalized candle data for a symbol and timeframe with smart SQLite caching.
 async fn get_candles(
     State(state): State<WebState>,
     Query(params): Query<CandlesQuery>,
@@ -203,20 +206,51 @@ async fn get_candles(
         .parse()
         .map_err(|e: String| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })))?;
 
-    let candles = state
-        .provider
-        .fetch_candles(&params.symbol, timeframe)
-        .await
-        .map_err(|e| {
-            (
+    let force = params.force.unwrap_or(false);
+    let tf_label = timeframe.label();
+
+    // 1. Check if SQLite cache is already fresh (60s TTL during market hours, or market closed)
+    if !force {
+        if let Ok(true) = state.db.is_fresh(&params.symbol, tf_label, 60) {
+            if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
+                if !cached.is_empty() {
+                    return Ok(Json(cached));
+                }
+            }
+        }
+    }
+
+    // 2. Otherwise fetch from Yahoo Provider
+    match state.provider.fetch_candles(&params.symbol, timeframe).await {
+        Ok(candles) => {
+            let now = chrono::Utc::now().timestamp();
+            // Cache in SQLite with upsert
+            let _ = state.db.save_candles(&params.symbol, tf_label, &candles, now);
+
+            // Return full accumulated historical candles from DB
+            if let Ok(all_candles) = state.db.get_candles(&params.symbol, tf_label) {
+                if !all_candles.is_empty() {
+                    return Ok(Json(all_candles));
+                }
+            }
+            Ok(Json(candles))
+        }
+        Err(e) => {
+            // Graceful fallback: If network request failed or rate-limited,
+            // return any cached candles we already have in SQLite
+            if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
+                if !cached.is_empty() {
+                    return Ok(Json(cached));
+                }
+            }
+            Err((
                 StatusCode::BAD_REQUEST,
                 Json(ErrorResponse {
                     error: e.to_string(),
                 }),
-            )
-        })?;
-
-    Ok(Json(candles))
+            ))
+        }
+    }
 }
 
 /// Scan movers across the universe.
@@ -334,6 +368,26 @@ async fn get_scan_state() -> Json<ScanState> {
     Json(ScanState::load(&state_path))
 }
 
+/// Get cache synchronization metadata for a symbol and timeframe.
+async fn get_cache_meta(
+    State(state): State<WebState>,
+    Query(params): Query<CandlesQuery>,
+) -> Result<Json<Option<CacheSyncMeta>>, (StatusCode, Json<ErrorResponse>)> {
+    let meta = state
+        .db
+        .get_sync_meta(&params.symbol, &params.timeframe)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(meta))
+}
+
 /// Build the Axum router with all routes and middleware.
 pub fn create_router(state: WebState) -> Router {
     Router::new()
@@ -343,6 +397,7 @@ pub fn create_router(state: WebState) -> Router {
         .route("/api/stocks", get(get_stocks).post(add_stock))
         .route("/api/stocks/{symbol}", delete(delete_stock))
         .route("/api/candles", get(get_candles))
+        .route("/api/cache/meta", get(get_cache_meta))
         .route("/api/scan", get(scan_movers))
         .route("/api/scan/cached", get(get_scan_cached))
         .route("/api/scan/state", get(get_scan_state))
@@ -356,9 +411,11 @@ pub async fn start_server(
     open_browser: bool,
 ) -> anyhow::Result<()> {
     let provider = Arc::new(YahooProvider::new()?);
+    let db = MarketDb::open_default()?;
     let state = WebState {
         config_path,
         provider,
+        db,
     };
 
     let app = create_router(state);

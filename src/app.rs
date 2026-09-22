@@ -30,8 +30,9 @@ pub async fn run(timeframe: Timeframe, symbol_arg: Option<&str>) -> anyhow::Resu
     let stock = resolve_stock(&stock_config, symbol_arg)?;
     println!("Fetching {} data for {}...", timeframe, stock.symbol);
 
-    // Fetch market data
-    let provider = YahooProvider::new()?;
+    // Fetch market data with SQLite caching
+    let db = crate::storage::MarketDb::open_default()?;
+    let provider = crate::provider::CachedProvider::new(YahooProvider::new()?, db);
     let candles = provider.fetch_candles(&stock.symbol, timeframe).await?;
     println!(
         "Received {} candles for {} ({})",

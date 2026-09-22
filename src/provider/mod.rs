@@ -3,7 +3,10 @@
 //! Defines the `MarketDataProvider` trait that all data sources implement.
 //! The application layer only depends on this trait, never on provider-specific types.
 
+pub mod cached;
 pub mod yahoo;
+
+pub use cached::CachedProvider;
 
 use crate::domain::{Candle, Timeframe};
 use crate::error::MarketError;
