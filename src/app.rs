@@ -54,35 +54,64 @@ pub async fn run_scan(threshold: f64, notify: bool, catchup: bool, popup: bool) 
     let mut state = ScanState::load(&state_path);
     let ist_now = now_ist();
 
-    let slot_label = if catchup {
-        let pending = state.determine_pending_slot(ist_now);
-        match pending {
-            Some(slot) => {
-                println!("[Catchup] Missed scheduled slot detected: {}", slot.label());
-                Some(slot)
-            }
-            None => {
-                println!("✓ No missed scan slots. Last scans are up to date.");
-                return Ok(());
-            }
+    let pending_slots = if catchup {
+        let slots = state.determine_pending_slots(ist_now);
+        if slots.is_empty() {
+            println!("✓ No missed scan slots. Last scans are up to date.");
+            return Ok(());
         }
+        slots
     } else {
-        None
+        vec![]
     };
 
     let config_path = find_config_path()?;
     let stock_config = config::load_stock_config(&config_path)?;
 
-    println!(
-        "Scanning {} stocks for moves exceeding ±{:.1}%...",
-        stock_config.stocks.len(),
-        threshold
-    );
+    let slots = if catchup {
+        pending_slots.into_iter().map(Some).collect()
+    } else {
+        vec![None]
+    };
 
-    let provider = Arc::new(YahooProvider::new()?);
-    let scanner = Scanner::new(provider);
-    let result = scanner.scan(&stock_config.stocks, threshold).await?;
+    for slot in slots {
+        if let Some(slot) = slot {
+            println!("[Catchup] Missed scheduled slot detected: {}", slot.label());
+        }
 
+        println!(
+            "Scanning {} stocks for moves exceeding ±{:.1}%...",
+            stock_config.stocks.len(),
+            threshold
+        );
+
+        let provider = Arc::new(YahooProvider::new()?);
+        let scanner = Scanner::new(provider);
+        let result = scanner.scan(&stock_config.stocks, threshold).await?;
+
+        print_scan_result(&result, threshold);
+
+        if let Some(slot) = slot {
+            let today_str = ist_now.format("%Y-%m-%d").to_string();
+            state.record_slot_completion(slot, &today_str, result.clone());
+        } else {
+            state.last_scan_result = Some(result.clone());
+        }
+        state.save(&state_path)?;
+
+        if notify {
+            send_desktop_notification(&result, slot.map(|s| s.label()));
+        }
+
+        if popup {
+            show_popup_dialog(&result, slot.map(|s| s.label()));
+        }
+    }
+
+    Ok(())
+}
+
+fn print_scan_result(result: &crate::domain::ScanResult, threshold: f64) {
     println!("\n╔════════════════════════════════════════════════════════════════════════╗");
     println!("║                 MarketWatch Stock Universe Scan Result                 ║");
     println!("╠════════════════════════════════════════════════════════════════════════╣");
@@ -109,7 +138,7 @@ pub async fn run_scan(threshold: f64, notify: bool, catchup: bool, popup: bool) 
             let chg_sign = if m.change_percent >= 0.0 { "+" } else { "" };
             let chg_str = format!("{}{:.2}%", chg_sign, m.change_percent);
             let name_disp = if m.name.chars().count() > 30 {
-                format!("{}...", &m.name.chars().take(27).collect::<String>())
+                format!("{}...", m.name.chars().take(27).collect::<String>())
             } else {
                 m.name.clone()
             };
@@ -120,27 +149,6 @@ pub async fn run_scan(threshold: f64, notify: bool, catchup: bool, popup: bool) 
         }
         println!();
     }
-
-    if let Some(slot) = slot_label {
-        let today_str = ist_now.format("%Y-%m-%d").to_string();
-        state.record_slot_completion(slot, &today_str, result.clone());
-        let _ = state.save(&state_path);
-    } else {
-        state.last_scan_result = Some(result.clone());
-        let _ = state.save(&state_path);
-    }
-
-    if notify {
-        let label = slot_label.map(|s| s.label());
-        send_desktop_notification(&result, label);
-    }
-
-    if popup {
-        let label = slot_label.map(|s| s.label());
-        show_popup_dialog(&result, label);
-    }
-
-    Ok(())
 }
 
 /// Run continuous background daemon.

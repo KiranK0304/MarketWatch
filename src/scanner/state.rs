@@ -80,6 +80,14 @@ impl ScanState {
     /// Checks Indian Standard Time (IST). If current time is past 09:30 or 15:30 on a weekday
     /// and that slot has not yet run today, it returns the pending slot.
     pub fn determine_pending_slot(&self, ist_now: DateTime<FixedOffset>) -> Option<ScheduledSlot> {
+        self.determine_pending_slots(ist_now).into_iter().next()
+    }
+
+    /// Determine all scheduled slots that are due and have not run today.
+    ///
+    /// Morning is returned before evening so a catch-up run cannot skip the
+    /// earlier slot when both scheduled scans were missed.
+    pub fn determine_pending_slots(&self, ist_now: DateTime<FixedOffset>) -> Vec<ScheduledSlot> {
         let weekday = ist_now.weekday();
         // Indian stock exchanges (NSE/BSE) trade Monday to Friday
         let is_trading_day = matches!(
@@ -92,7 +100,7 @@ impl ScanState {
         );
 
         if !is_trading_day {
-            return None;
+            return Vec::new();
         }
 
         let today_str = ist_now.format("%Y-%m-%d").to_string();
@@ -101,20 +109,19 @@ impl ScanState {
         const MORNING_MINUTES: u32 = 9 * 60 + 30; // 09:30 AM
         const EVENING_MINUTES: u32 = 15 * 60 + 30; // 03:30 PM
 
-        // If it is past 15:30 and evening scan hasn't run today
-        if current_minutes >= EVENING_MINUTES {
-            if self.last_evening_scan_date.as_deref() != Some(&today_str) {
-                return Some(ScheduledSlot::Evening);
-            }
+        let mut pending = Vec::new();
+        if current_minutes >= MORNING_MINUTES
+            && self.last_morning_scan_date.as_deref() != Some(&today_str)
+        {
+            pending.push(ScheduledSlot::Morning);
         }
-        // If it is past 09:30 and morning scan hasn't run today
-        else if current_minutes >= MORNING_MINUTES {
-            if self.last_morning_scan_date.as_deref() != Some(&today_str) {
-                return Some(ScheduledSlot::Morning);
-            }
+        if current_minutes >= EVENING_MINUTES
+            && self.last_evening_scan_date.as_deref() != Some(&today_str)
+        {
+            pending.push(ScheduledSlot::Evening);
         }
 
-        None
+        pending
     }
 
     /// Get default path for saving scan state:
@@ -162,6 +169,12 @@ mod tests {
         // Monday at 16:00 (after 15:30 evening slot)
         let monday_16_00 = ist.with_ymd_and_hms(2026, 9, 21, 16, 0, 0).unwrap();
         assert_eq!(state.determine_pending_slot(monday_16_00), Some(ScheduledSlot::Evening));
+
+        let both_missed = ScanState::default();
+        assert_eq!(
+            both_missed.determine_pending_slots(monday_16_00),
+            vec![ScheduledSlot::Morning, ScheduledSlot::Evening]
+        );
 
         // Mark evening scan as completed
         state.last_evening_scan_date = Some("2026-09-21".to_string());
