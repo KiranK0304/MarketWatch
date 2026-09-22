@@ -70,6 +70,7 @@ Description=MarketWatch Scheduled Scanner (09:30 AM & 03:30 PM IST)
 [Timer]
 OnCalendar=Mon..Fri 09:30:00
 OnCalendar=Mon..Fri 15:30:00
+Timezone=Asia/Kolkata
 Persistent=true
 
 [Install]
