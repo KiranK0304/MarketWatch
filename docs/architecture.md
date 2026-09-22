@@ -49,14 +49,18 @@ flowchart TD
 ### A. Web Terminal Dashboard (`src/web/`)
 * **Single-Page Application**: Embedded directly into the Rust binary at compile-time using `include_str!("index.html")`. Zero external file dependencies to deploy or run.
 * **Charting Library**: TradingView Lightweight Charts (v4.2.1) loaded from CDN.
-* **Key Features**:
-  * **White Default / Black Toggle**: Clean high-contrast white theme by default, toggleable to dark theme with <kbd>T</kbd>.
-  * **🔍 Dynamic Zoom Slider**: Adjustable candle spacing dial (1 to 10 pixels), persisted across page reloads via `localStorage`.
+* **Modern Dual-Sidebar / Rail Layout (v2)**:
+  * **⚡ Slim Navigation Rail (56px)**: Quick toggle between Single Chart, Multi-Chart Grid, Watchlist Drawer, Intel Drawer, Theme switcher, and Command Palette (<kbd>Ctrl+K</kbd>).
+  * **🎛️ Minimalist Top Bar**: Live symbol & percentage pill, segmented timeframe switchers (`5m` to `1w`), zoom dial, cache status badge, and drawer triggers.
+  * **🧠 Collapsible Intel & System Drawer**:
+    * **AI Insights**: Algorithmic pivot levels (Classic P, R1, R2, S1, S2) and live candlestick pattern recognition (Engulfing, Hammer, Doji).
+    * **Fundamentals**: Ticker statistics, market exchange, loaded bar count, and data freshness.
+    * **System & Logs**: 1-click copyable systemctl commands, live journalctl logs monitor, and SQLite cache stats.
+  * **🔍 Dynamic Zoom Dial**: Adjustable candle spacing dial (1 to 10 pixels), persisted via `localStorage`.
   * **Broker-Style Crosshair & Hover Tooltip**: Real-time candle percentage change badge displayed directly at the cursor and in the header OHLC banner.
   * **Right-Side Candle Padding**: Last candle offset away from Y-axis for easy future-projection reading.
   * **Top 150 Watchlist & Screener**: Live search, category badges, top movers filtering (gainers/losers by 1%, 2%, 3%, 5% threshold).
   * **Multi-Chart Grid Mode**: View mini-charts for all market movers simultaneously.
-  * **💻 System Operations & Intelligence Hub**: Text-focused operations view with 1-click copyable systemd commands (restart, live log tailing, service status), database inspection utilities, keyboard shortcuts cheat sheet, and the AI research & stock fundamentals blueprint.
 
 ### B. Storage & Caching Layer (`src/storage/` & `src/provider/cached.rs`)
 * **`MarketDb`**: Embedded SQLite wrapper managing connection pooling with WAL mode and transaction-safe upserts.
