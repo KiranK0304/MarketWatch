@@ -14,6 +14,17 @@ use std::process::Command;
 pub struct ServiceManager;
 
 impl ServiceManager {
+    fn unit_arg(value: &str) -> String {
+        if value
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '"' | '\\'))
+        {
+            format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+        } else {
+            value.to_string()
+        }
+    }
+
     /// Get path to the compiled market executable.
     pub fn executable_path() -> PathBuf {
         if let Ok(exe) = std::env::current_exe() {
@@ -34,9 +45,9 @@ impl ServiceManager {
         let home = std::env::var("HOME")
             .map_err(|_| anyhow::anyhow!("HOME environment variable not set"))?;
         let exe_path = Self::executable_path();
-        let exe_str = exe_path.to_str().unwrap_or("market");
+        let exe_str = Self::unit_arg(exe_path.to_str().unwrap_or("market"));
         let work_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from(&home));
-        let work_dir_str = work_dir.to_str().unwrap_or("");
+        let work_dir_str = Self::unit_arg(work_dir.to_str().unwrap_or(""));
 
         let systemd_dir = PathBuf::from(&home).join(".config/systemd/user");
         let autostart_dir = PathBuf::from(&home).join(".config/autostart");
