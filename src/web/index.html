@@ -906,6 +906,174 @@
       border: 1px solid rgba(239, 68, 68, 0.4);
     }
 
+    /* Terminal & Intel View Container */
+    #intel-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      padding: 24px;
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    #intel-container.visible {
+      display: flex;
+    }
+
+    .intel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .intel-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .intel-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .intel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 20px;
+    }
+
+    .intel-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .intel-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 8px;
+    }
+
+    .cmd-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .cmd-item-desc {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cmd-code-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--bg-main);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent-blue);
+      overflow-x: auto;
+    }
+
+    .cmd-code-row code {
+      white-space: nowrap;
+      user-select: text;
+    }
+
+    .copy-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-blue);
+      color: #fff;
+      border-color: var(--accent-blue);
+    }
+
+    .intel-pill {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+    }
+
+    .shortcut-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--border-subtle);
+      font-size: 13px;
+    }
+
+    .shortcut-keys {
+      display: flex;
+      gap: 4px;
+    }
+
+    .shortcut-key {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+
+    .ai-badge {
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
     /* Summary Bar below chart */
     .stats-footer {
       height: 38px;
@@ -1119,6 +1287,13 @@
           </svg>
           <span>Multi-Chart Grid</span>
         </button>
+        <button class="view-btn" id="btn-view-intel" title="System Commands, Logs & Research (I)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span>Intel & Docs</span>
+        </button>
       </div>
 
       <!-- Timeframes -->
@@ -1257,6 +1432,236 @@
       <!-- Multi-Chart Grid Container for all Movers -->
       <div id="chart-grid-container"></div>
 
+      <!-- Terminal Commands & Stock Intel View -->
+      <div id="intel-container">
+        <!-- Intel Header with Active Stock info -->
+        <div class="intel-header">
+          <div>
+            <div class="intel-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+              <span>System Operations & Intelligence Hub</span>
+            </div>
+            <div class="intel-subtitle">Essential terminal commands, service operations, real-time logging, shortcuts, and research foundation</div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="intel-pill" id="intel-active-stock">RELIANCE.NS</span>
+            <span class="intel-pill" id="intel-cache-status">⚡ SQLite Cached</span>
+          </div>
+        </div>
+
+        <div class="intel-grid">
+          <!-- Card 1: System Service & Daemon Commands -->
+          <div class="intel-card">
+            <div class="intel-card-header">
+              <span>⚙️ System Service & Daemon Operations</span>
+              <span class="intel-pill">systemd / Linux</span>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Restart Web Terminal Service</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>systemctl --user restart marketwatch-web.service</code>
+                <button class="copy-btn" onclick="copyToClipboard('systemctl --user restart marketwatch-web.service', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Tail Live Real-Time Logs (Follow Mode)</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>journalctl --user -u marketwatch-web.service -f</code>
+                <button class="copy-btn" onclick="copyToClipboard('journalctl --user -u marketwatch-web.service -f', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>View Recent 50 Log Lines</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>journalctl --user -u marketwatch-web.service -n 50 --no-pager</code>
+                <button class="copy-btn" onclick="copyToClipboard('journalctl --user -u marketwatch-web.service -n 50 --no-pager', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Check Service Status & Memory</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>systemctl --user status marketwatch-web.service</code>
+                <button class="copy-btn" onclick="copyToClipboard('systemctl --user status marketwatch-web.service', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Recompile Release Binary</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>cargo build --release</code>
+                <button class="copy-btn" onclick="copyToClipboard('cargo build --release', this)">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: CLI Scanner & Database Utilities -->
+          <div class="intel-card">
+            <div class="intel-card-header">
+              <span>🔍 Scanner & SQLite Database Operations</span>
+              <span class="intel-pill">CLI / Storage</span>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Trigger Manual 3% Movers Scan (with Desktop Notification)</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>market scan --threshold 3.0 --notify</code>
+                <button class="copy-btn" onclick="copyToClipboard('market scan --threshold 3.0 --notify', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Run Missed-Scan Catch-Up Check</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>market scan --catchup</code>
+                <button class="copy-btn" onclick="copyToClipboard('market scan --catchup', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Check SQLite Cache Metadata (Active Stock)</span>
+              </div>
+              <div class="cmd-code-row">
+                <code id="cmd-meta-inspect">curl -s "http://localhost:3000/api/cache/meta?symbol=RELIANCE.NS&timeframe=15m" | jq</code>
+                <button class="copy-btn" onclick="copyToClipboard(document.getElementById('cmd-meta-inspect').textContent, this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>Inspect Database Files on Disk</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>ls -lh ~/.config/marketwatch/marketwatch.db*</code>
+                <button class="copy-btn" onclick="copyToClipboard('ls -lh ~/.config/marketwatch/marketwatch.db*', this)">Copy</button>
+              </div>
+            </div>
+
+            <div class="cmd-item">
+              <div class="cmd-item-desc">
+                <span>View Scanner Scheduled State</span>
+              </div>
+              <div class="cmd-code-row">
+                <code>cat ~/.config/marketwatch/scanner_state.json | jq .</code>
+                <button class="copy-btn" onclick="copyToClipboard('cat ~/.config/marketwatch/scanner_state.json | jq .', this)">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Keyboard Shortcuts Reference -->
+          <div class="intel-card">
+            <div class="intel-card-header">
+              <span>⌨️ Keyboard Navigation & Shortcuts</span>
+              <span class="intel-pill">Productivity</span>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Navigate Stocks (Next / Prev)</span>
+              <div class="shortcut-keys"><span class="shortcut-key">↑</span><span class="shortcut-key">↓</span> or <span class="shortcut-key">J</span><span class="shortcut-key">K</span></div>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Switch Timeframe (5m, 15m, 30m, 1h, 1d, 1w)</span>
+              <div class="shortcut-keys"><span class="shortcut-key">1</span> ... <span class="shortcut-key">6</span></div>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Force Remote Sync (Bypass Cache)</span>
+              <div class="shortcut-keys"><span class="shortcut-key">R</span></div>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Toggle White (Default) / Black Theme</span>
+              <div class="shortcut-keys"><span class="shortcut-key">T</span></div>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Toggle Universe / Movers Screener</span>
+              <div class="shortcut-keys"><span class="shortcut-key">M</span></div>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Toggle Single Chart / Multi-Chart Grid</span>
+              <div class="shortcut-keys"><span class="shortcut-key">G</span></div>
+            </div>
+
+            <div class="shortcut-row">
+              <span style="color: var(--text-secondary);">Switch to Intel & Docs Hub</span>
+              <div class="shortcut-keys"><span class="shortcut-key">I</span></div>
+            </div>
+          </div>
+
+          <!-- Card 4: Stock Fundamentals & AI Research Harness -->
+          <div class="intel-card">
+            <div class="intel-card-header">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>🧠 Stock Intelligence & AI Research Harness</span>
+                <span class="ai-badge">Preview</span>
+              </div>
+              <span class="intel-pill" id="intel-stock-tag">Research Foundation</span>
+            </div>
+
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+              Active Stock: <strong id="intel-research-symbol" style="color: var(--text-primary)">RELIANCE.NS</strong> (<span id="intel-research-name">Reliance Industries</span>)
+            </div>
+
+            <!-- Fundamentals Placeholder Grid -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: var(--bg-subtle); padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 11px;">
+              <div>
+                <div style="color: var(--text-muted);">Current Price</div>
+                <div style="font-weight: 700; font-size: 13px;" id="intel-price">--</div>
+              </div>
+              <div>
+                <div style="color: var(--text-muted);">Cached Bars</div>
+                <div style="font-weight: 700; font-size: 13px;" id="intel-bars">--</div>
+              </div>
+              <div>
+                <div style="color: var(--text-muted);">Last Sync</div>
+                <div style="font-weight: 700; font-size: 13px;" id="intel-synced">--</div>
+              </div>
+            </div>
+
+            <!-- Upcoming AI Modules Blueprint -->
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+              <div style="font-weight: 600; color: var(--text-primary); margin-top: 4px;">Planned Research Modules:</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
+                <span style="color: var(--accent-blue);">●</span>
+                <span><strong>Fundamental Ratios:</strong> P/E, P/B, Market Cap, ROCE, Debt-to-Equity</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
+                <span style="color: var(--accent-blue);">●</span>
+                <span><strong>Catalysts & News Feed:</strong> Corporate filings, quarterly earnings, sector news</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
+                <span style="color: var(--accent-blue);">●</span>
+                <span><strong>AI Synthesis Harness:</strong> Automated LLM technical pattern summary & risk evaluation</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Loading overlay -->
       <div class="chart-loading" id="chart-loading">
         <div class="spinner"></div>
@@ -1318,7 +1723,7 @@
     let currentTimeframe = '15m';
     let isDark = false; // Default is WHITE (Light mode)
     let currentTab = 'universe'; // 'universe' | 'movers'
-    let currentViewMode = 'single'; // 'single' | 'grid'
+    let currentViewMode = 'single'; // 'single' | 'grid' | 'intel'
     let currentThreshold = 3.0;
     let currentMoverFilter = 'all'; // 'all' | 'gainers' | 'losers'
     let moversData = null; // ScanResult
@@ -1346,6 +1751,7 @@
     // Elements
     const chartContainer = document.getElementById('chart-container');
     const chartGridContainer = document.getElementById('chart-grid-container');
+    const intelContainer = document.getElementById('intel-container');
     const stockListEl = document.getElementById('stock-list');
     const searchInput = document.getElementById('search-input');
     const stockCountEl = document.getElementById('stock-count');
@@ -1362,6 +1768,7 @@
     const tabMoversCount = document.getElementById('tab-movers-count');
     const btnViewSingle = document.getElementById('btn-view-single');
     const btnViewGrid = document.getElementById('btn-view-grid');
+    const btnViewIntel = document.getElementById('btn-view-intel');
     const btnScanTrigger = document.getElementById('btn-scan-trigger');
     const customThreshInput = document.getElementById('custom-thresh');
 
@@ -1704,6 +2111,8 @@
 
       if (currentViewMode === 'single') {
         fetchChartData();
+      } else if (currentViewMode === 'intel') {
+        renderIntelView();
       }
     }
 
@@ -1871,25 +2280,91 @@
       });
     }
 
-    // Multi-Chart Grid for Movers
+    // Multi-Chart Grid for Movers & Intel View
     function setViewMode(mode) {
       currentViewMode = mode;
       btnViewSingle.classList.toggle('active', mode === 'single');
       btnViewGrid.classList.toggle('active', mode === 'grid');
+      btnViewIntel.classList.toggle('active', mode === 'intel');
 
       if (mode === 'single') {
         chartContainer.style.display = 'block';
         chartGridContainer.classList.remove('visible');
+        intelContainer.classList.remove('visible');
         document.getElementById('ohlc-banner').style.display = 'flex';
         document.getElementById('stats-footer').style.display = 'flex';
         initChart();
         fetchChartData();
-      } else {
+      } else if (mode === 'grid') {
         chartContainer.style.display = 'none';
         chartGridContainer.classList.add('visible');
+        intelContainer.classList.remove('visible');
         document.getElementById('ohlc-banner').style.display = 'none';
         document.getElementById('stats-footer').style.display = 'none';
         renderMultiChartGrid();
+      } else if (mode === 'intel') {
+        chartContainer.style.display = 'none';
+        chartGridContainer.classList.remove('visible');
+        intelContainer.classList.add('visible');
+        document.getElementById('ohlc-banner').style.display = 'none';
+        document.getElementById('stats-footer').style.display = 'none';
+        renderIntelView();
+      }
+    }
+
+    // Copy command to clipboard with UI feedback
+    function copyToClipboard(text, btn) {
+      if (!navigator.clipboard) {
+        showToast('Clipboard access unavailable');
+        return;
+      }
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.background = 'var(--bullish)';
+        btn.style.color = '#fff';
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.style.background = '';
+          btn.style.color = '';
+        }, 1500);
+      }).catch(() => {
+        showToast('Failed to copy');
+      });
+    }
+
+    // Populate active stock details and SQLite cache stats in Intel View
+    async function renderIntelView() {
+      const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+      if (activeList.length === 0) return;
+      const stock = activeList[currentIndex] || activeList[0];
+      if (!stock) return;
+
+      document.getElementById('intel-active-stock').textContent = stock.symbol;
+      document.getElementById('intel-research-symbol').textContent = stock.symbol;
+      document.getElementById('intel-research-name').textContent = stock.name;
+      document.getElementById('cmd-meta-inspect').textContent = `curl -s "http://localhost:3000/api/cache/meta?symbol=${stock.symbol}&timeframe=${currentTimeframe}" | jq`;
+
+      const priceBadge = document.getElementById('hdr-price').textContent;
+      document.getElementById('intel-price').textContent = priceBadge && priceBadge !== '--' ? `₹${priceBadge}` : '--';
+
+      try {
+        const res = await fetch(`/api/cache/meta?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}`);
+        if (res.ok) {
+          const meta = await res.json();
+          if (meta && meta.candle_count > 0) {
+            document.getElementById('intel-cache-status').textContent = `⚡ SQLite: ${meta.candle_count} bars`;
+            document.getElementById('intel-bars').textContent = `${meta.candle_count} (${meta.timeframe})`;
+            const syncDate = new Date(meta.last_synced_at * 1000);
+            document.getElementById('intel-synced').textContent = syncDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          } else {
+            document.getElementById('intel-cache-status').textContent = '🌐 Uncached';
+            document.getElementById('intel-bars').textContent = '0';
+            document.getElementById('intel-synced').textContent = 'Never';
+          }
+        }
+      } catch (e) {
+        document.getElementById('intel-cache-status').textContent = 'Error';
       }
     }
 
@@ -2081,6 +2556,7 @@
     // View Mode Toggle Listeners
     btnViewSingle.addEventListener('click', () => setViewMode('single'));
     btnViewGrid.addEventListener('click', () => setViewMode('grid'));
+    btnViewIntel.addEventListener('click', () => setViewMode('intel'));
 
     // Threshold chips
     document.querySelectorAll('.threshold-chip').forEach(chip => {
@@ -2173,8 +2649,10 @@
         currentTimeframe = btn.dataset.tf;
         if (currentViewMode === 'single') {
           fetchChartData();
-        } else {
+        } else if (currentViewMode === 'grid') {
           renderMultiChartGrid();
+        } else if (currentViewMode === 'intel') {
+          renderIntelView();
         }
       });
     });
@@ -2228,7 +2706,8 @@
           b.classList.toggle('active', b.dataset.tf === currentTimeframe);
         });
         if (currentViewMode === 'single') fetchChartData();
-        else renderMultiChartGrid();
+        else if (currentViewMode === 'grid') renderMultiChartGrid();
+        else if (currentViewMode === 'intel') renderIntelView();
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         if (currentTab === 'movers') runScanMovers(true);
@@ -2243,6 +2722,9 @@
       } else if (e.key === 'g' || e.key === 'G') {
         e.preventDefault();
         setViewMode(currentViewMode === 'single' ? 'grid' : 'single');
+      } else if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        setViewMode(currentViewMode === 'intel' ? 'single' : 'intel');
       } else if (e.key === '/') {
         e.preventDefault();
         searchInput.focus();
