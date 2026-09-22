@@ -90,7 +90,9 @@ impl Scanner {
         let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
         let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
         let movers_count = movers.len();
-        let total_scanned = all_quotes.len();
+        // This is the configured universe size; failed provider requests are
+        // still attempted and should not make the scan appear smaller.
+        let total_scanned = stocks.len();
 
         Ok(ScanResult {
             timestamp: now.timestamp(),
