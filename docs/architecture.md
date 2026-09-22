@@ -56,6 +56,7 @@ flowchart TD
   * **Right-Side Candle Padding**: Last candle offset away from Y-axis for easy future-projection reading.
   * **Top 150 Watchlist & Screener**: Live search, category badges, top movers filtering (gainers/losers by 1%, 2%, 3%, 5% threshold).
   * **Multi-Chart Grid Mode**: View mini-charts for all market movers simultaneously.
+  * **💻 System Operations & Intelligence Hub**: Text-focused operations view with 1-click copyable systemd commands (restart, live log tailing, service status), database inspection utilities, keyboard shortcuts cheat sheet, and the AI research & stock fundamentals blueprint.
 
 ### B. Storage & Caching Layer (`src/storage/` & `src/provider/cached.rs`)
 * **`MarketDb`**: Embedded SQLite wrapper managing connection pooling with WAL mode and transaction-safe upserts.
