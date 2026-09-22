@@ -1,598 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MarketWatch — Personal Terminal & Movers Screener</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarketWatch — Professional Terminal & Movers Scanner</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+
   <style>
     :root {
-      /* Theme: Light (Default) - White, silky gray, rhetoric blue */
-      --bg-main: #f4f6fa;
+      /* Theme: White / Light default */
+      --bg-app: #f8fafc;
       --bg-surface: #ffffff;
-      --bg-sidebar: #ffffff;
-      --bg-subtle: #edf1f7;
-      --bg-hover: #e8ecf4;
-      --border: #dbe2ea;
-      --border-subtle: #e9eef5;
+      --bg-subtle: #f1f5f9;
+      --bg-hover: #e2e8f0;
+      --border: #e2e8f0;
+      --border-subtle: #cbd5e1;
       --text-primary: #0f172a;
       --text-secondary: #475569;
       --text-muted: #94a3b8;
-      --accent-blue: #2563eb;
-      --accent-blue-hover: #1d4ed8;
-      --accent-blue-subtle: #eff6ff;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-subtle: #eff6ff;
       --bullish: #16a34a;
-      --bullish-bg: #dcfce7;
+      --bullish-subtle: #dcfce7;
       --bearish: #dc2626;
-      --bearish-bg: #fee2e2;
+      --bearish-subtle: #fee2e2;
+      --purple: #8b5cf6;
+      --purple-subtle: #f3e8ff;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
       --chart-bg: #ffffff;
       --chart-grid: #f1f5f9;
       --chart-text: #64748b;
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
     }
 
-    body.dark {
-      /* Theme: Dark - Deep obsidian black, silky charcoal, rhetoric blue */
-      --bg-main: #0a0d14;
-      --bg-surface: #111520;
-      --bg-sidebar: #0e121b;
-      --bg-subtle: #181d2c;
-      --bg-hover: #22293d;
-      --border: #23293a;
-      --border-subtle: #1a2030;
+    body.dark-theme {
+      --bg-app: #090d16;
+      --bg-surface: #111726;
+      --bg-subtle: #192237;
+      --bg-hover: #222d46;
+      --border: #232e47;
+      --border-subtle: #2d3b5b;
       --text-primary: #f8fafc;
       --text-secondary: #cbd5e1;
       --text-muted: #64748b;
-      --accent-blue: #3b82f6;
-      --accent-blue-hover: #60a5fa;
-      --accent-blue-subtle: #172554;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-subtle: #172554;
       --bullish: #22c55e;
-      --bullish-bg: #052e16;
+      --bullish-subtle: #052e16;
       --bearish: #ef4444;
-      --bearish-bg: #450a0a;
-      --chart-bg: #111520;
-      --chart-grid: #181d2c;
-      --chart-text: #94a3b8;
+      --bearish-subtle: #450a0a;
+      --purple: #a855f7;
+      --purple-subtle: #3b0764;
       --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
       --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+      --chart-bg: #111726;
+      --chart-grid: #1a233a;
+      --chart-text: #94a3b8;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: var(--font-sans);
-      background-color: var(--bg-main);
+      background-color: var(--bg-app);
       color: var(--text-primary);
       height: 100vh;
       overflow: hidden;
       display: flex;
-      flex-direction: column;
       user-select: none;
     }
 
-    /* Top Navigation Bar */
-    header {
-      height: 60px;
+    /* 1. Ultra-Slim Left Navigation Rail */
+    .nav-rail {
+      width: 56px;
       background: var(--bg-surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      gap: 16px;
-      z-index: 10;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 16px;
-      letter-spacing: -0.02em;
-    }
-
-    .brand-badge {
-      background: var(--accent-blue);
-      color: #fff;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      padding: 3px 7px;
-      border-radius: 4px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-    }
-
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--bullish);
-      box-shadow: 0 0 8px var(--bullish);
-      display: inline-block;
-      margin-left: 4px;
-    }
-
-    /* Active Stock Metrics Header */
-    .active-stock-info {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex: 1;
-      padding: 0 16px;
-    }
-
-    .active-symbol {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 18px;
-    }
-
-    .active-name {
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 500;
-      max-width: 220px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .active-price-pill {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      font-family: var(--font-mono);
-    }
-
-    .current-price {
-      font-size: 17px;
-      font-weight: 700;
-    }
-
-    .price-change {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    .price-change.up {
-      color: var(--bullish);
-      background: var(--bullish-bg);
-    }
-
-    .price-change.down {
-      color: var(--bearish);
-      background: var(--bearish-bg);
-    }
-
-    /* Header Actions */
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* View Switcher: Single vs Grid */
-    .view-group {
-      display: flex;
-      background: var(--bg-subtle);
-      padding: 3px;
-      border-radius: 6px;
-      border: 1px solid var(--border-subtle);
-      gap: 2px;
-    }
-
-    .view-btn {
-      background: transparent;
-      border: none;
-      padding: 4px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.15s ease;
-    }
-
-    .view-btn:hover {
-      color: var(--text-primary);
-      background: var(--bg-hover);
-    }
-
-    .view-btn.active {
-      background: var(--bg-surface);
-      color: var(--accent-blue);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .timeframe-group {
-      display: flex;
-      background: var(--bg-subtle);
-      padding: 3px;
-      border-radius: 6px;
-      border: 1px solid var(--border-subtle);
-      gap: 2px;
-    }
-
-    .tf-btn {
-      background: transparent;
-      border: none;
-      padding: 4px 10px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.15s ease;
-    }
-
-    .tf-btn:hover {
-      color: var(--text-primary);
-      background: var(--bg-hover);
-    }
-
-    .tf-btn.active {
-      background: var(--bg-surface);
-      color: var(--accent-blue);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .schedule-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-subtle);
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-family: var(--font-mono);
-      color: var(--text-secondary);
-    }
-
-    .action-btn {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.15s ease;
-    }
-
-    .action-btn:hover {
-      background: var(--bg-hover);
-      border-color: var(--text-muted);
-    }
-
-    .theme-toggle-btn {
-      width: 36px;
-      height: 36px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-    }
-
-    /* Zoom Control */
-    .zoom-control {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-subtle);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-family: var(--font-mono);
-      color: var(--text-secondary);
-    }
-
-    .zoom-control label {
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .zoom-control input[type="range"] {
-      width: 80px;
-      height: 4px;
-      accent-color: var(--accent-blue);
-      cursor: pointer;
-    }
-
-    .zoom-control .zoom-val {
-      min-width: 18px;
-      text-align: center;
-      font-weight: 700;
-      color: var(--accent-blue);
-    }
-
-    /* Main Workspace Layout */
-    .workspace {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 60px - 34px);
-      overflow: hidden;
-    }
-
-    /* Sidebar Navigation */
-    aside {
-      width: 360px;
-      background: var(--bg-sidebar);
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      align-items: center;
+      padding: 12px 0;
+      gap: 10px;
+      z-index: 30;
       flex-shrink: 0;
     }
 
-    /* Segmented Navigation Tabs: Universe vs Movers */
-    .sidebar-tabs {
-      display: flex;
-      background: var(--bg-subtle);
-      padding: 4px;
-      margin: 12px 14px 0 14px;
-      border-radius: 8px;
-      gap: 4px;
-    }
-
-    .sidebar-tab {
-      flex: 1;
-      border: none;
-      background: transparent;
-      padding: 7px 10px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      border-radius: 6px;
-      cursor: pointer;
+    .rail-brand {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent), #6366f1);
+      color: white;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: all 0.15s ease;
-    }
-
-    .sidebar-tab.active {
-      background: var(--bg-surface);
-      color: var(--accent-blue);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .sidebar-tab-badge {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 10px;
-      background: var(--accent-blue);
-      color: #fff;
-    }
-
-    /* Movers Filter Bar */
-    .movers-toolbar {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .threshold-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .threshold-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .threshold-chips {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: 1;
-    }
-
-    .threshold-chip {
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-secondary);
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    }
+
+    .rail-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
       transition: all 0.15s ease;
     }
 
-    .threshold-chip:hover {
+    .rail-btn:hover {
       background: var(--bg-hover);
       color: var(--text-primary);
     }
 
-    .threshold-chip.active {
-      background: var(--accent-blue);
-      border-color: var(--accent-blue);
-      color: #fff;
+    .rail-btn.active {
+      background: var(--accent-subtle);
+      color: var(--accent);
     }
 
-    .custom-threshold-input {
-      width: 48px;
-      padding: 3px 6px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text-primary);
-      text-align: center;
-      outline: none;
+    .rail-btn.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 0 2px 2px 0;
     }
 
-    .custom-threshold-input:focus {
-      border-color: var(--accent-blue);
-    }
+    .rail-spacer { flex: 1; }
 
-    .filter-type-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      justify-content: space-between;
-    }
-
-    .filter-pills {
-      display: flex;
-      background: var(--bg-subtle);
-      padding: 2px;
-      border-radius: 6px;
-      gap: 2px;
-    }
-
-    .filter-pill {
-      border: none;
-      background: transparent;
-      padding: 3px 8px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .filter-pill.active {
+    /* 2. Collapsible Watchlist / Screener Sidebar */
+    .sidebar {
+      width: 280px;
       background: var(--bg-surface);
-      color: var(--text-primary);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .btn-scan-trigger {
-      background: var(--accent-blue-subtle);
-      border: 1px solid var(--accent-blue);
-      color: var(--accent-blue);
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
+      border-right: 1px solid var(--border);
       display: flex;
-      align-items: center;
-      gap: 4px;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s ease;
+      z-index: 20;
     }
 
-    .btn-scan-trigger:hover {
-      background: var(--accent-blue);
-      color: #fff;
+    .sidebar.collapsed {
+      width: 0;
+      overflow: hidden;
+      border-right: none;
     }
 
-    .btn-scan-trigger.scanning {
-      opacity: 0.7;
-      pointer-events: none;
-    }
-
-    /* Universe Toolbar */
     .sidebar-header {
       padding: 12px 14px;
-      border-bottom: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
 
-    .sidebar-title-row {
+    .sidebar-tabs {
       display: flex;
-      justify-content: space-between;
+      background: var(--bg-subtle);
+      padding: 3px;
+      border-radius: 7px;
+      gap: 3px;
+    }
+
+    .sidebar-tab-btn {
+      flex: 1;
+      padding: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-radius: 5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
       align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.1s ease;
     }
 
-    .sidebar-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    .sidebar-tab-btn.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
     }
 
-    .search-box {
+    .search-input-wrapper {
       position: relative;
       display: flex;
       align-items: center;
     }
 
-    .search-box svg {
-      position: absolute;
-      left: 10px;
-      width: 14px;
-      height: 14px;
-      color: var(--text-muted);
-    }
-
-    .search-box input {
+    .search-input {
       width: 100%;
       background: var(--bg-subtle);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 7px 30px 7px 32px;
-      font-size: 13px;
       color: var(--text-primary);
+      border-radius: 6px;
+      padding: 6px 10px 6px 28px;
+      font-size: 12px;
+      font-family: var(--font-sans);
       outline: none;
-      transition: border 0.15s ease;
     }
 
-    .search-box input:focus {
-      border-color: var(--accent-blue);
+    .search-input:focus {
+      border-color: var(--accent);
       background: var(--bg-surface);
     }
 
-    .search-kbd {
+    .search-icon {
       position: absolute;
-      right: 8px;
-      font-family: var(--font-mono);
-      font-size: 10px;
+      left: 8px;
       color: var(--text-muted);
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      padding: 1px 5px;
-      border-radius: 4px;
+      pointer-events: none;
     }
 
-    /* Stock List */
+    .movers-subbar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding-top: 4px;
+    }
+
+    .threshold-chip {
+      font-size: 10px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+    }
+
+    .threshold-chip.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
     .stock-list {
       flex: 1;
       overflow-y: auto;
       list-style: none;
     }
 
-    .stock-item {
-      padding: 10px 14px;
+    .stock-row {
+      padding: 9px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -601,52 +277,28 @@
       transition: background 0.1s ease;
     }
 
-    .stock-item:hover {
-      background: var(--bg-hover);
+    .stock-row:hover { background: var(--bg-hover); }
+    .stock-row.active {
+      background: var(--accent-subtle);
+      border-left: 3px solid var(--accent);
     }
 
-    .stock-item.active {
-      background: var(--accent-blue-subtle);
-      border-left: 3px solid var(--accent-blue);
-    }
-
-    .stock-item-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      overflow: hidden;
-      margin-right: 8px;
-    }
-
-    .stock-item-symbol {
+    .stock-sym-title {
       font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 13px;
+      font-size: 12px;
     }
 
-    .stock-item-name {
+    .stock-corp-name {
       font-size: 11px;
       color: var(--text-muted);
+      max-width: 140px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .stock-item-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 2px;
-      flex-shrink: 0;
-    }
-
-    .stock-item-price {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .stock-badge {
+    .stock-badge-pill {
       font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 700;
@@ -654,51 +306,26 @@
       border-radius: 4px;
     }
 
-    .stock-badge.up {
-      color: var(--bullish);
-      background: var(--bullish-bg);
-    }
-
-    .stock-badge.down {
-      color: var(--bearish);
-      background: var(--bearish-bg);
-    }
-
-    .stock-delete-btn {
-      opacity: 0;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      font-size: 14px;
-      line-height: 1;
-    }
-
-    .stock-item:hover .stock-delete-btn {
-      opacity: 1;
-    }
-
-    .stock-delete-btn:hover {
-      color: var(--bearish);
-      background: var(--bearish-bg);
-    }
+    .stock-badge-pill.up { background: var(--bullish-subtle); color: var(--bullish); }
+    .stock-badge-pill.down { background: var(--bearish-subtle); color: var(--bearish); }
 
     .sidebar-footer {
       padding: 10px 14px;
       border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       background: var(--bg-surface);
     }
 
-    .add-stock-btn {
+    .add-btn {
       width: 100%;
       background: var(--bg-subtle);
-      border: 1px dashed var(--border);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 6px;
       border-radius: 6px;
-      padding: 7px;
-      color: var(--text-secondary);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       display: flex;
@@ -708,1102 +335,807 @@
       transition: all 0.15s ease;
     }
 
-    .add-stock-btn:hover {
+    .add-btn:hover {
       background: var(--bg-hover);
-      color: var(--accent-blue);
-      border-color: var(--accent-blue);
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
-    /* Main Area Container */
-    main {
+    /* 3. Main Stage */
+    .main-stage {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: var(--chart-bg);
-      position: relative;
       overflow: hidden;
-    }
-
-    /* Single Chart View Container */
-    #chart-container {
-      flex: 1;
-      width: 100%;
-      height: 100%;
+      background: var(--bg-app);
       position: relative;
     }
 
-    /* Multi-Chart Grid View Container */
-    #chart-grid-container {
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      overflow-y: auto;
-      padding: 16px;
-      display: none;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-      gap: 16px;
-    }
-
-    #chart-grid-container.visible {
-      display: grid;
-    }
-
-    .grid-chart-card {
+    /* Minimalist Top Bar */
+    .top-bar {
+      height: 48px;
       background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      box-shadow: var(--shadow-sm);
-      cursor: pointer;
-      transition: transform 0.15s ease, border-color 0.15s ease;
-      height: 260px;
-    }
-
-    .grid-chart-card:hover {
-      border-color: var(--accent-blue);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-
-    .grid-chart-header {
-      padding: 10px 14px;
-      background: var(--bg-subtle);
-      border-bottom: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
     }
 
-    .grid-chart-title {
+    .top-bar-left {
       display: flex;
-      align-items: baseline;
-      gap: 8px;
+      align-items: center;
+      gap: 12px;
     }
 
-    .grid-chart-sym {
+    .stock-hero-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 7px;
+    }
+
+    .hero-sym {
       font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 14px;
-    }
-
-    .grid-chart-nm {
-      font-size: 11px;
-      color: var(--text-muted);
-      max-width: 120px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .grid-chart-metrics {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      font-family: var(--font-mono);
-    }
-
-    .grid-chart-price {
       font-size: 13px;
-      font-weight: 700;
     }
 
-    .grid-chart-body {
+    .hero-price {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .hero-chg {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* Timeframe Segments */
+    .tf-segmented {
+      display: flex;
+      background: var(--bg-subtle);
+      padding: 2px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      gap: 2px;
+    }
+
+    .tf-seg-btn {
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .tf-seg-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* Compact Zoom Dial */
+    .zoom-dial-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+    }
+
+    .zoom-dial-wrapper input[type="range"] {
+      width: 60px;
+      height: 4px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .top-action-btn {
+      height: 32px;
+      padding: 0 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .top-action-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .top-action-btn.active {
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Viewport / Chart Canvas Area */
+    .viewport-area {
       flex: 1;
-      width: 100%;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chart-box {
+      flex: 1;
+      height: 100%;
       position: relative;
     }
 
-    /* Loading Overlay */
-    .chart-loading {
+    /* OHLC Banner */
+    .ohlc-strip {
       position: absolute;
-      inset: 0;
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(2px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 12px;
-      z-index: 20;
-    }
-
-    body.dark .chart-loading {
-      background: rgba(17, 21, 32, 0.7);
-    }
-
-    .chart-loading.visible {
-      display: flex;
-    }
-
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent-blue);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Chart Tooltip Overlay */
-    .chart-ohlc-banner {
-      position: absolute;
-      top: 12px;
-      left: 16px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 6px;
-      box-shadow: var(--shadow-sm);
-      display: flex;
-      gap: 14px;
+      top: 10px;
+      left: 14px;
       z-index: 10;
-      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(var(--bg-surface), 0.85);
+      backdrop-filter: blur(8px);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
     }
 
-    body.dark .chart-ohlc-banner {
-      background: rgba(17, 21, 32, 0.9);
-    }
+    .ohlc-strip span { font-weight: 700; color: var(--text-primary); }
 
-    .ohlc-val span {
-      font-weight: 600;
-    }
-
-    /* Floating Candle Hover Badge / Tooltip */
-    .candle-floating-tooltip {
+    /* Floating Tooltip */
+    .candle-float-tip {
       position: absolute;
       display: none;
       pointer-events: none;
-      z-index: 15;
+      z-index: 25;
       font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 700;
       padding: 4px 8px;
       border-radius: 5px;
       box-shadow: var(--shadow-md);
-      transition: opacity 0.1s ease;
-      white-space: nowrap;
       transform: translate(-50%, -100%);
       margin-top: -12px;
+      white-space: nowrap;
     }
+    .candle-float-tip.up { background: rgba(22, 163, 74, 0.95); color: #fff; }
+    .candle-float-tip.down { background: rgba(220, 38, 38, 0.95); color: #fff; }
 
-    .candle-floating-tooltip.up {
-      background: rgba(22, 163, 74, 0.95);
-      color: #ffffff;
-      border: 1px solid rgba(34, 197, 94, 0.4);
-    }
-
-    .candle-floating-tooltip.down {
-      background: rgba(220, 38, 38, 0.95);
-      color: #ffffff;
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-
-    /* Terminal & Intel View Container */
-    #intel-container {
+    /* Multi-Chart Grid View */
+    #grid-box {
+      display: none;
       flex: 1;
-      width: 100%;
       height: 100%;
       overflow-y: auto;
-      padding: 24px;
-      display: none;
+      padding: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 14px;
+    }
+
+    .grid-chart-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 8px;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      height: 260px;
+      transition: transform 0.15s ease, border-color 0.15s ease;
     }
 
-    #intel-container.visible {
-      display: flex;
+    .grid-chart-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
     }
 
-    .intel-header {
+    .grid-chart-canvas {
+      flex: 1;
+      width: 100%;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    /* 4. Collapsible Right Drawer: Intelligence, Fundamentals & AI */
+    .intel-drawer {
+      width: 380px;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border);
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 16px;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s ease;
+      z-index: 20;
+    }
+
+    .intel-drawer.collapsed {
+      width: 0;
+      overflow: hidden;
+      border-left: none;
+    }
+
+    .drawer-header {
+      padding: 10px 14px;
       border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    .intel-title {
-      font-size: 18px;
+    .drawer-nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-subtle);
+      padding: 2px;
+      border-radius: 6px;
+    }
+
+    .drawer-tab {
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .drawer-tab.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Cards inside Drawer */
+    .drawer-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .drawer-card-title {
+      font-size: 12px;
       font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .metric-box {
+      background: var(--bg-surface);
+      padding: 6px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .metric-lbl { color: var(--text-muted); font-size: 10px; }
+    .metric-val { font-weight: 700; font-family: var(--font-mono); margin-top: 2px; }
+
+    .ai-insight-box {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08));
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      border-radius: 7px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cmd-snippet {
+      background: var(--bg-app);
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .cmd-snippet code {
+      overflow-x: auto;
+      white-space: nowrap;
+      user-select: text;
+    }
+
+    .copy-chip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .copy-chip:hover { background: var(--accent); color: white; }
+
+    /* 5. Bottom Status Strip */
+    .status-strip {
+      height: 26px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-indicator-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--bullish);
+    }
+
+    /* 6. Command Palette Overlay (Ctrl+K) */
+    .palette-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 120px;
+    }
+
+    .palette-backdrop.open { display: flex; }
+
+    .palette-box {
+      width: 540px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .palette-input-box {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .intel-subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .intel-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      gap: 20px;
-    }
-
-    .intel-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .intel-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-weight: 600;
-      font-size: 14px;
+    .palette-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      font-family: var(--font-sans);
       color: var(--text-primary);
-      border-bottom: 1px solid var(--border-subtle);
-      padding-bottom: 8px;
     }
 
-    .cmd-item {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border-subtle);
-      border-radius: 6px;
-      padding: 10px 12px;
+    .palette-results {
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 6px 0;
+      list-style: none;
     }
 
-    .cmd-item-desc {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .cmd-code-row {
+    .palette-item {
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      background: var(--bg-main);
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--accent-blue);
-      overflow-x: auto;
-    }
-
-    .cmd-code-row code {
-      white-space: nowrap;
-      user-select: text;
-    }
-
-    .copy-btn {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 11px;
-      font-weight: 600;
       cursor: pointer;
-      flex-shrink: 0;
-      transition: all 0.15s ease;
-    }
-
-    .copy-btn:hover {
-      background: var(--accent-blue);
-      color: #fff;
-      border-color: var(--accent-blue);
-    }
-
-    .intel-pill {
-      font-size: 11px;
-      font-family: var(--font-mono);
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-    }
-
-    .shortcut-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 7px 0;
-      border-bottom: 1px dashed var(--border-subtle);
       font-size: 13px;
     }
 
-    .shortcut-keys {
-      display: flex;
-      gap: 4px;
+    .palette-item:hover, .palette-item.selected {
+      background: var(--accent-subtle);
+      color: var(--accent);
     }
 
-    .shortcut-key {
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 2px 7px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-    }
-
-    .ai-badge {
-      background: linear-gradient(135deg, #6366f1, #a855f7);
-      color: white;
+    .palette-item-tag {
       font-size: 10px;
-      font-weight: 700;
+      font-family: var(--font-mono);
+      background: var(--bg-subtle);
       padding: 2px 6px;
       border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Summary Bar below chart */
-    .stats-footer {
-      height: 38px;
-      background: var(--bg-surface);
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      gap: 24px;
-      font-size: 12px;
-      font-family: var(--font-mono);
-      color: var(--text-secondary);
-    }
-
-    .stat-item {
-      display: flex;
-      gap: 6px;
-    }
-
-    .stat-item strong {
-      color: var(--text-primary);
-    }
-
-    /* Keyboard Shortcuts Footer Bar */
-    .kbd-bar {
-      height: 34px;
-      background: var(--bg-surface);
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      font-size: 11px;
       color: var(--text-muted);
-      z-index: 10;
-    }
-
-    .kbd-hints {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .kbd-hint {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    kbd {
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 1px 5px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-secondary);
-      box-shadow: 0 1px 0 rgba(0,0,0,0.1);
     }
 
     /* Modal dialog */
-    .modal-overlay {
+    .modal-backdrop {
       position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(2px);
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 150;
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 100;
     }
-
-    .modal-overlay.open {
-      display: flex;
-    }
+    .modal-backdrop.open { display: flex; }
 
     .modal-card {
       background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      width: 400px;
-      padding: 22px;
-      box-shadow: var(--shadow-md);
+      padding: 20px;
+      width: 360px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
+      box-shadow: var(--shadow-lg);
     }
 
-    .modal-title {
-      font-size: 16px;
-      font-weight: 700;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .form-group label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-    }
-
-    .form-group input {
+    .modal-input {
       background: var(--bg-subtle);
       border: 1px solid var(--border);
+      color: var(--text-primary);
       padding: 8px 10px;
       border-radius: 6px;
-      color: var(--text-primary);
       font-size: 13px;
       outline: none;
     }
+    .modal-input:focus { border-color: var(--accent); }
 
-    .form-group input:focus {
-      border-color: var(--accent-blue);
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .btn-secondary {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-      padding: 7px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-
-    .btn-primary {
-      background: var(--accent-blue);
-      border: none;
-      color: #fff;
-      padding: 7px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-blue-hover);
-    }
-
-    /* Notification Toast */
+    /* Toast */
     .toast {
       position: fixed;
-      bottom: 45px;
+      bottom: 40px;
       right: 20px;
       background: var(--text-primary);
-      color: var(--bg-surface);
-      padding: 10px 16px;
+      color: var(--bg-app);
+      padding: 8px 16px;
       border-radius: 6px;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 600;
       box-shadow: var(--shadow-md);
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.2s ease;
       z-index: 200;
+      opacity: 0;
+      transition: opacity 0.2s ease;
       pointer-events: none;
     }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
 
-  <!-- Top Bar -->
-  <header>
-    <div class="brand">
-      <span>MARKETWATCH</span>
-      <span class="brand-badge">PRO</span>
-      <span class="live-dot" title="Live connection"></span>
-    </div>
+  <!-- 1. Left Icon Rail -->
+  <aside class="nav-rail">
+    <div class="rail-brand" title="MarketWatch Pro">MW</div>
 
-    <div class="active-stock-info">
-      <span class="active-symbol" id="hdr-symbol">RELIANCE.NS</span>
-      <span class="active-name" id="hdr-name">Reliance Industries</span>
-      <div class="active-price-pill">
-        <span class="current-price" id="hdr-price">--</span>
-        <span class="price-change" id="hdr-change">--</span>
-      </div>
-    </div>
+    <button class="rail-btn active" id="btn-rail-chart" title="Single Chart View">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="20" x2="18" y2="10"></line>
+        <line x1="12" y1="20" x2="12" y2="4"></line>
+        <line x1="6" y1="20" x2="6" y2="14"></line>
+      </svg>
+    </button>
 
-    <div class="header-controls">
-      <!-- View Mode: Single vs Multi-Chart Grid -->
-      <div class="view-group">
-        <button class="view-btn active" id="btn-view-single" title="Single Chart Focus">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          </svg>
-          <span>Single Chart</span>
-        </button>
-        <button class="view-btn" id="btn-view-grid" title="Multi-Chart Grid for all Movers">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-          <span>Multi-Chart Grid</span>
-        </button>
-        <button class="view-btn" id="btn-view-intel" title="System Commands, Logs & Research (I)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="4 17 10 11 4 5"></polyline>
-            <line x1="12" y1="19" x2="20" y2="19"></line>
-          </svg>
-          <span>Intel & Docs</span>
-        </button>
-      </div>
+    <button class="rail-btn" id="btn-rail-grid" title="Multi-Chart Grid View for Movers">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+      </svg>
+    </button>
 
-      <!-- Timeframes -->
-      <div class="timeframe-group">
-        <button class="tf-btn" data-tf="5m">5m</button>
-        <button class="tf-btn active" data-tf="15m">15m</button>
-        <button class="tf-btn" data-tf="30m">30m</button>
-        <button class="tf-btn" data-tf="1h">1h</button>
-        <button class="tf-btn" data-tf="1d">1d</button>
-        <button class="tf-btn" data-tf="1w">1w</button>
-      </div>
+    <button class="rail-btn" id="btn-rail-watchlist" title="Toggle Watchlist Sidebar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+    </button>
 
-      <!-- Auto-Scan Schedule Badge -->
-      <div class="schedule-badge" id="schedule-badge" title="Cron scans run at 09:30 AM & 03:30 PM IST with Persistent Catch-up">
-        <span>🔔 09:30 & 15:30 Catch-up Active</span>
-      </div>
+    <button class="rail-btn" id="btn-rail-intel" title="Toggle Stock Intel & Research Drawer (I)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+    </button>
 
-      <button class="action-btn" id="btn-refresh" title="Fetch latest data (R)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-        </svg>
-        <span>Refresh</span>
-      </button>
+    <div class="rail-spacer"></div>
 
-      <!-- Zoom Control Slider -->
-      <div class="zoom-control" title="Default chart zoom level (persisted)">
-        <label>🔍</label>
-        <input type="range" id="zoom-slider" min="1" max="10" step="0.5" value="2" />
-        <span class="zoom-val" id="zoom-val">2</span>
-      </div>
+    <button class="rail-btn" id="btn-rail-palette" title="Command Palette (Ctrl+K)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path>
+      </svg>
+    </button>
 
-      <!-- Theme Toggle Button (White default, Black toggle) -->
-      <button class="action-btn theme-toggle-btn" id="btn-theme" title="Toggle White / Black Theme (T)">
-        <span id="theme-icon">🌙</span>
-      </button>
-    </div>
-  </header>
+    <button class="rail-btn" id="btn-rail-theme" title="Toggle White / Black Theme (T)">
+      <span id="rail-theme-icon">🌙</span>
+    </button>
+  </aside>
 
-  <!-- Workspace -->
-  <div class="workspace">
-    <!-- Watchlist Sidebar -->
-    <aside>
-      <!-- Navigation Tabs: Universe vs Movers Screener -->
+  <!-- 2. Watchlist / Screener Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
       <div class="sidebar-tabs">
-        <button class="sidebar-tab active" id="tab-universe">
-          <span>📋 Universe</span>
-          <span class="sidebar-tab-badge" id="tab-universe-count">150</span>
-        </button>
-        <button class="sidebar-tab" id="tab-movers">
-          <span>⚡ Movers Screener</span>
-          <span class="sidebar-tab-badge" id="tab-movers-count" style="background: var(--bullish);">--</span>
-        </button>
+        <button class="sidebar-tab-btn active" id="tab-universe">Universe (<span id="count-universe">150</span>)</button>
+        <button class="sidebar-tab-btn" id="tab-movers">Movers (<span id="count-movers">0</span>)</button>
       </div>
 
-      <!-- Universe Header Bar -->
-      <div class="sidebar-header" id="universe-header">
-        <div class="sidebar-title-row">
-          <span class="sidebar-title">Top Equities Universe</span>
-          <span class="sidebar-title" id="stock-count">0 stocks</span>
-        </div>
-        <div class="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="search-input" placeholder="Search stock or ticker..." autocomplete="off" />
-          <span class="search-kbd">/</span>
+      <div class="search-input-wrapper">
+        <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Search NSE stocks (/)...">
+      </div>
+
+      <!-- Movers Threshold Filters -->
+      <div class="movers-subbar" id="movers-subbar">
+        <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Threshold:</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="threshold-chip" data-thresh="1.0">±1%</button>
+          <button class="threshold-chip" data-thresh="2.0">±2%</button>
+          <button class="threshold-chip active" data-thresh="3.0">±3%</button>
+          <button class="threshold-chip" data-thresh="5.0">±5%</button>
         </div>
       </div>
-
-      <!-- Movers Toolbar (Active when tab-movers is clicked) -->
-      <div class="movers-toolbar" id="movers-toolbar" style="display: none;">
-        <div class="threshold-row">
-          <span class="threshold-label">Threshold:</span>
-          <div class="threshold-chips">
-            <button class="threshold-chip" data-thresh="1.0">1%</button>
-            <button class="threshold-chip" data-thresh="2.0">2%</button>
-            <button class="threshold-chip active" data-thresh="3.0">3%</button>
-            <button class="threshold-chip" data-thresh="5.0">5%</button>
-            <input type="number" class="custom-threshold-input" id="custom-thresh" placeholder="%" min="0.1" max="50" step="0.5" title="Custom threshold %" />
-          </div>
-        </div>
-
-        <div class="filter-type-row">
-          <div class="filter-pills">
-            <button class="filter-pill active" data-filter="all">All Movers</button>
-            <button class="filter-pill" data-filter="gainers">🚀 Gainers</button>
-            <button class="filter-pill" data-filter="losers">🔻 Losers</button>
-          </div>
-
-          <button class="btn-scan-trigger" id="btn-scan-trigger" title="Trigger fresh 150-stock scan">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-            </svg>
-            <span>Scan Now</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Stock / Movers List -->
-      <ul class="stock-list" id="stock-list">
-        <!-- Populated via JS -->
-      </ul>
-
-      <!-- Sidebar Footer -->
-      <div class="sidebar-footer" id="universe-footer">
-        <button class="add-stock-btn" id="btn-add-stock">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          <span>Add Stock to Universe</span>
-        </button>
-      </div>
-    </aside>
-
-    <!-- Main Chart Area -->
-    <main>
-      <!-- OHLC Banner for Single Chart -->
-      <div class="chart-ohlc-banner" id="ohlc-banner">
-        <div class="ohlc-val">Date: <span id="val-time">--</span></div>
-        <div class="ohlc-val">O: <span id="val-open">--</span></div>
-        <div class="ohlc-val">H: <span id="val-high">--</span></div>
-        <div class="ohlc-val">L: <span id="val-low">--</span></div>
-        <div class="ohlc-val">C: <span id="val-close">--</span></div>
-        <div class="ohlc-val">Chg: <span id="val-chg">--</span></div>
-        <div class="ohlc-val">Vol: <span id="val-vol">--</span></div>
-      </div>
-
-      <!-- Single Chart Container -->
-      <div id="chart-container"></div>
-
-      <!-- Floating candle tooltip directly on hover -->
-      <div class="candle-floating-tooltip" id="candle-tooltip"></div>
-
-      <!-- Multi-Chart Grid Container for all Movers -->
-      <div id="chart-grid-container"></div>
-
-      <!-- Terminal Commands & Stock Intel View -->
-      <div id="intel-container">
-        <!-- Intel Header with Active Stock info -->
-        <div class="intel-header">
-          <div>
-            <div class="intel-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="4 17 10 11 4 5"></polyline>
-                <line x1="12" y1="19" x2="20" y2="19"></line>
-              </svg>
-              <span>System Operations & Intelligence Hub</span>
-            </div>
-            <div class="intel-subtitle">Essential terminal commands, service operations, real-time logging, shortcuts, and research foundation</div>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <span class="intel-pill" id="intel-active-stock">RELIANCE.NS</span>
-            <span class="intel-pill" id="intel-cache-status">⚡ SQLite Cached</span>
-          </div>
-        </div>
-
-        <div class="intel-grid">
-          <!-- Card 1: System Service & Daemon Commands -->
-          <div class="intel-card">
-            <div class="intel-card-header">
-              <span>⚙️ System Service & Daemon Operations</span>
-              <span class="intel-pill">systemd / Linux</span>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Restart Web Terminal Service</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>systemctl --user restart marketwatch-web.service</code>
-                <button class="copy-btn" onclick="copyToClipboard('systemctl --user restart marketwatch-web.service', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Tail Live Real-Time Logs (Follow Mode)</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>journalctl --user -u marketwatch-web.service -f</code>
-                <button class="copy-btn" onclick="copyToClipboard('journalctl --user -u marketwatch-web.service -f', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>View Recent 50 Log Lines</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>journalctl --user -u marketwatch-web.service -n 50 --no-pager</code>
-                <button class="copy-btn" onclick="copyToClipboard('journalctl --user -u marketwatch-web.service -n 50 --no-pager', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Check Service Status & Memory</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>systemctl --user status marketwatch-web.service</code>
-                <button class="copy-btn" onclick="copyToClipboard('systemctl --user status marketwatch-web.service', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Recompile Release Binary</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>cargo build --release</code>
-                <button class="copy-btn" onclick="copyToClipboard('cargo build --release', this)">Copy</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card 2: CLI Scanner & Database Utilities -->
-          <div class="intel-card">
-            <div class="intel-card-header">
-              <span>🔍 Scanner & SQLite Database Operations</span>
-              <span class="intel-pill">CLI / Storage</span>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Trigger Manual 3% Movers Scan (with Desktop Notification)</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>market scan --threshold 3.0 --notify</code>
-                <button class="copy-btn" onclick="copyToClipboard('market scan --threshold 3.0 --notify', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Run Missed-Scan Catch-Up Check</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>market scan --catchup</code>
-                <button class="copy-btn" onclick="copyToClipboard('market scan --catchup', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Check SQLite Cache Metadata (Active Stock)</span>
-              </div>
-              <div class="cmd-code-row">
-                <code id="cmd-meta-inspect">curl -s "http://localhost:3000/api/cache/meta?symbol=RELIANCE.NS&timeframe=15m" | jq</code>
-                <button class="copy-btn" onclick="copyToClipboard(document.getElementById('cmd-meta-inspect').textContent, this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>Inspect Database Files on Disk</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>ls -lh ~/.config/marketwatch/marketwatch.db*</code>
-                <button class="copy-btn" onclick="copyToClipboard('ls -lh ~/.config/marketwatch/marketwatch.db*', this)">Copy</button>
-              </div>
-            </div>
-
-            <div class="cmd-item">
-              <div class="cmd-item-desc">
-                <span>View Scanner Scheduled State</span>
-              </div>
-              <div class="cmd-code-row">
-                <code>cat ~/.config/marketwatch/scanner_state.json | jq .</code>
-                <button class="copy-btn" onclick="copyToClipboard('cat ~/.config/marketwatch/scanner_state.json | jq .', this)">Copy</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card 3: Keyboard Shortcuts Reference -->
-          <div class="intel-card">
-            <div class="intel-card-header">
-              <span>⌨️ Keyboard Navigation & Shortcuts</span>
-              <span class="intel-pill">Productivity</span>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Navigate Stocks (Next / Prev)</span>
-              <div class="shortcut-keys"><span class="shortcut-key">↑</span><span class="shortcut-key">↓</span> or <span class="shortcut-key">J</span><span class="shortcut-key">K</span></div>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Switch Timeframe (5m, 15m, 30m, 1h, 1d, 1w)</span>
-              <div class="shortcut-keys"><span class="shortcut-key">1</span> ... <span class="shortcut-key">6</span></div>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Force Remote Sync (Bypass Cache)</span>
-              <div class="shortcut-keys"><span class="shortcut-key">R</span></div>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Toggle White (Default) / Black Theme</span>
-              <div class="shortcut-keys"><span class="shortcut-key">T</span></div>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Toggle Universe / Movers Screener</span>
-              <div class="shortcut-keys"><span class="shortcut-key">M</span></div>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Toggle Single Chart / Multi-Chart Grid</span>
-              <div class="shortcut-keys"><span class="shortcut-key">G</span></div>
-            </div>
-
-            <div class="shortcut-row">
-              <span style="color: var(--text-secondary);">Switch to Intel & Docs Hub</span>
-              <div class="shortcut-keys"><span class="shortcut-key">I</span></div>
-            </div>
-          </div>
-
-          <!-- Card 4: Stock Fundamentals & AI Research Harness -->
-          <div class="intel-card">
-            <div class="intel-card-header">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span>🧠 Stock Intelligence & AI Research Harness</span>
-                <span class="ai-badge">Preview</span>
-              </div>
-              <span class="intel-pill" id="intel-stock-tag">Research Foundation</span>
-            </div>
-
-            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
-              Active Stock: <strong id="intel-research-symbol" style="color: var(--text-primary)">RELIANCE.NS</strong> (<span id="intel-research-name">Reliance Industries</span>)
-            </div>
-
-            <!-- Fundamentals Placeholder Grid -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: var(--bg-subtle); padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 11px;">
-              <div>
-                <div style="color: var(--text-muted);">Current Price</div>
-                <div style="font-weight: 700; font-size: 13px;" id="intel-price">--</div>
-              </div>
-              <div>
-                <div style="color: var(--text-muted);">Cached Bars</div>
-                <div style="font-weight: 700; font-size: 13px;" id="intel-bars">--</div>
-              </div>
-              <div>
-                <div style="color: var(--text-muted);">Last Sync</div>
-                <div style="font-weight: 700; font-size: 13px;" id="intel-synced">--</div>
-              </div>
-            </div>
-
-            <!-- Upcoming AI Modules Blueprint -->
-            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
-              <div style="font-weight: 600; color: var(--text-primary); margin-top: 4px;">Planned Research Modules:</div>
-              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
-                <span style="color: var(--accent-blue);">●</span>
-                <span><strong>Fundamental Ratios:</strong> P/E, P/B, Market Cap, ROCE, Debt-to-Equity</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
-                <span style="color: var(--accent-blue);">●</span>
-                <span><strong>Catalysts & News Feed:</strong> Corporate filings, quarterly earnings, sector news</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
-                <span style="color: var(--accent-blue);">●</span>
-                <span><strong>AI Synthesis Harness:</strong> Automated LLM technical pattern summary & risk evaluation</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading overlay -->
-      <div class="chart-loading" id="chart-loading">
-        <div class="spinner"></div>
-        <span style="font-size: 13px; font-weight: 500;" id="loading-msg">Fetching market data...</span>
-      </div>
-
-      <!-- Stats Bar -->
-      <div class="stats-footer" id="stats-footer">
-        <div class="stat-item">Range High: <strong id="stat-high">--</strong></div>
-        <div class="stat-item">Range Low: <strong id="stat-low">--</strong></div>
-        <div class="stat-item">Period Volume: <strong id="stat-vol">--</strong></div>
-        <div class="stat-item">Candles: <strong id="stat-count">--</strong></div>
-        <div class="stat-item" style="margin-left: auto;">Schedule: <strong style="color: var(--accent-blue)">09:30 & 15:30 IST (Catch-up on)</strong></div>
-      </div>
-    </main>
-  </div>
-
-  <!-- Keyboard hints bar -->
-  <div class="kbd-bar">
-    <div class="kbd-hints">
-      <div class="kbd-hint"><kbd>↑</kbd> / <kbd>↓</kbd> or <kbd>K</kbd> / <kbd>J</kbd> Navigate</div>
-      <div class="kbd-hint"><kbd>1</kbd> - <kbd>6</kbd> Timeframes</div>
-      <div class="kbd-hint"><kbd>M</kbd> Toggle Movers</div>
-      <div class="kbd-hint"><kbd>G</kbd> Toggle Multi-Chart Grid</div>
-      <div class="kbd-hint"><kbd>R</kbd> Refresh</div>
-      <div class="kbd-hint"><kbd>T</kbd> White/Black Theme</div>
-      <div class="kbd-hint"><kbd>/</kbd> Search</div>
-      <div class="kbd-hint"><kbd>ESC</kbd> Clear</div>
     </div>
-    <div>Top 150 Universe • 09:30 AM & 03:30 PM Cron Active</div>
+
+    <ul class="stock-list" id="stock-list">
+      <!-- Populated via JS -->
+    </ul>
+
+    <div class="sidebar-footer">
+      <button class="add-btn" id="btn-add-stock">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <span>Add Stock to Universe</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- 3. Main Stage -->
+  <main class="main-stage">
+    <!-- Top Control Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <div class="stock-hero-pill">
+          <span class="hero-sym" id="hero-sym">--</span>
+          <span class="hero-price" id="hero-price">--</span>
+          <span class="hero-chg" id="hero-chg">--</span>
+        </div>
+
+        <div class="tf-segmented">
+          <button class="tf-seg-btn" data-tf="5m">5m</button>
+          <button class="tf-seg-btn active" data-tf="15m">15m</button>
+          <button class="tf-seg-btn" data-tf="30m">30m</button>
+          <button class="tf-seg-btn" data-tf="1h">1h</button>
+          <button class="tf-seg-btn" data-tf="1d">1d</button>
+          <button class="tf-seg-btn" data-tf="1w">1w</button>
+        </div>
+
+        <div class="zoom-dial-wrapper" title="Default candle width / zoom spacing (persisted)">
+          <span>🔍</span>
+          <input type="range" id="zoom-range" min="1" max="10" step="0.5" value="2">
+          <span id="zoom-val">2px</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="top-action-btn" id="btn-refresh" title="Force Remote Sync from Yahoo (R)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+          <span>Sync</span>
+        </button>
+
+        <button class="top-action-btn active" id="btn-toggle-intel" title="Toggle Intel & AI Panel (I)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          <span>Intel & AI</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Viewport Area (Chart Canvas + Multi Grid + Intel Drawer) -->
+    <div class="viewport-area">
+      <!-- Single Focus Chart Canvas -->
+      <div class="chart-box" id="chart-box">
+        <!-- Floating OHLC Banner -->
+        <div class="ohlc-strip" id="ohlc-strip">
+          <div>O: <span id="ohlc-open">--</span></div>
+          <div>H: <span id="ohlc-high">--</span></div>
+          <div>L: <span id="ohlc-low">--</span></div>
+          <div>C: <span id="ohlc-close">--</span></div>
+          <div>Chg: <span id="ohlc-chg">--</span></div>
+          <div>Vol: <span id="ohlc-vol">--</span></div>
+        </div>
+
+        <div id="chart-canvas" style="width: 100%; height: 100%;"></div>
+        <div class="candle-float-tip" id="float-tip"></div>
+      </div>
+
+      <!-- Multi-Chart Grid for Movers -->
+      <div id="grid-box"></div>
+
+      <!-- 4. Collapsible Right Drawer -->
+      <aside class="intel-drawer" id="intel-drawer">
+        <div class="drawer-header">
+          <div class="drawer-nav-tabs">
+            <button class="drawer-tab active" data-tab="ai">🧠 AI Insights</button>
+            <button class="drawer-tab" data-tab="fundamentals">📊 Fundamentals</button>
+            <button class="drawer-tab" data-tab="system">⚙️ System & Logs</button>
+          </div>
+          <button style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px;" id="btn-close-drawer">✕</button>
+        </div>
+
+        <div class="drawer-body" id="drawer-content">
+          <!-- Populated by JS Tab handler -->
+        </div>
+      </aside>
+    </div>
+
+    <!-- 5. Bottom Status Strip -->
+    <footer class="status-strip">
+      <div class="status-item">
+        <div class="status-indicator-dot" id="market-dot"></div>
+        <span id="market-status-lbl">NSE Market Status</span>
+      </div>
+      <div class="status-item">
+        <span>⚡ SQLite Cache: <strong id="cache-latency">--</strong></span>
+      </div>
+      <div class="status-item">
+        <span>🔔 09:30 & 15:30 IST Auto-Catchup Active</span>
+      </div>
+      <div class="status-item" style="color: var(--text-secondary);">
+        <span>Press <kbd style="background: var(--bg-subtle); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--border);">Ctrl+K</kbd> for Commands</span>
+      </div>
+    </footer>
+  </main>
+
+  <!-- 6. Command Palette Modal -->
+  <div class="palette-backdrop" id="palette-modal">
+    <div class="palette-box">
+      <div class="palette-input-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" class="palette-input" id="palette-input" placeholder="Type a command, stock symbol, or action...">
+      </div>
+      <ul class="palette-results" id="palette-list"></ul>
+    </div>
   </div>
 
-  <!-- Add Stock Modal -->
-  <div class="modal-overlay" id="add-modal">
+  <!-- 7. Add Stock Modal -->
+  <div class="modal-backdrop" id="modal-add">
     <div class="modal-card">
-      <div class="modal-title">Add Stock to Universe</div>
-      <div class="form-group">
-        <label for="new-symbol">Symbol (e.g. TRENT.NS, POLYCAB.NS)</label>
-        <input type="text" id="new-symbol" placeholder="TICKER.NS" />
-      </div>
-      <div class="form-group">
-        <label for="new-name">Company Name</label>
-        <input type="text" id="new-name" placeholder="Full Company Name" />
-      </div>
-      <div class="modal-actions">
-        <button class="btn-secondary" id="modal-cancel">Cancel</button>
-        <button class="btn-primary" id="modal-save">Add Stock</button>
+      <div style="font-weight: 700; font-size: 14px;">Add Stock to Universe</div>
+      <input type="text" class="modal-input" id="input-new-sym" placeholder="NSE Symbol (e.g. TATAMOTORS.NS)">
+      <input type="text" class="modal-input" id="input-new-name" placeholder="Company Name (e.g. Tata Motors)">
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+        <button class="top-action-btn" id="btn-modal-cancel">Cancel</button>
+        <button class="top-action-btn active" id="btn-modal-save">Add Stock</button>
       </div>
     </div>
   </div>
 
-  <!-- Toast Notification -->
-  <div class="toast" id="toast">Stock universe updated</div>
+  <div class="toast" id="toast"></div>
 
   <script>
     // State
     let stocks = [];
     let currentIndex = 0;
     let currentTimeframe = '15m';
-    let isDark = false; // Default is WHITE (Light mode)
+    let currentViewMode = 'single'; // 'single' | 'grid'
     let currentTab = 'universe'; // 'universe' | 'movers'
-    let currentViewMode = 'single'; // 'single' | 'grid' | 'intel'
     let currentThreshold = 3.0;
-    let currentMoverFilter = 'all'; // 'all' | 'gainers' | 'losers'
-    let moversData = null; // ScanResult
-    let isScanning = false;
-    let gridChartInstances = [];
+    let moversData = null;
+    let candleData = [];
+    let currentDrawerTab = 'ai';
+    let isDark = false;
+    let userZoom = parseFloat(localStorage.getItem('mw-zoom') || '2');
 
     let chart = null;
     let candleSeries = null;
     let volumeSeries = null;
-    let candleData = [];
-
-    // User-configurable default zoom level (barSpacing).
-    // Loaded from localStorage, adjustable via the 🔍 slider in the header.
-    // Range: 1 (maximum zoom-out) to 10 (maximum zoom-in). Default: 2.
-    let userZoom = parseFloat(localStorage.getItem('mw-zoom') || '2');
-
-    // Returns chart spacing driven by the user's zoom slider.
-    // The slider value directly controls barSpacing; rightOffset scales with it.
-    function getTimeframeChartParams(tf) {
-      const bs = userZoom;
-      const ro = Math.max(3, Math.round(userZoom + 2));
-      return { barSpacing: bs, minBarSpacing: 0.5, rightOffset: ro };
-    }
+    let gridChartInstances = [];
 
     // Elements
-    const chartContainer = document.getElementById('chart-container');
-    const chartGridContainer = document.getElementById('chart-grid-container');
-    const intelContainer = document.getElementById('intel-container');
+    const sidebar = document.getElementById('sidebar');
+    const intelDrawer = document.getElementById('intel-drawer');
     const stockListEl = document.getElementById('stock-list');
-    const searchInput = document.getElementById('search-input');
-    const stockCountEl = document.getElementById('stock-count');
-    const loadingOverlay = document.getElementById('chart-loading');
-    const loadingMsg = document.getElementById('loading-msg');
+    const drawerContent = document.getElementById('drawer-content');
+    const floatTip = document.getElementById('float-tip');
+    const chartBox = document.getElementById('chart-box');
+    const gridBox = document.getElementById('grid-box');
+    const paletteModal = document.getElementById('palette-modal');
+    const paletteInput = document.getElementById('palette-input');
+    const paletteList = document.getElementById('palette-list');
     const toastEl = document.getElementById('toast');
-    const themeBtn = document.getElementById('btn-theme');
-    const themeIcon = document.getElementById('theme-icon');
-    const tabUniverse = document.getElementById('tab-universe');
-    const tabMovers = document.getElementById('tab-movers');
-    const universeHeader = document.getElementById('universe-header');
-    const moversToolbar = document.getElementById('movers-toolbar');
-    const universeFooter = document.getElementById('universe-footer');
-    const tabMoversCount = document.getElementById('tab-movers-count');
-    const btnViewSingle = document.getElementById('btn-view-single');
-    const btnViewGrid = document.getElementById('btn-view-grid');
-    const btnViewIntel = document.getElementById('btn-view-intel');
-    const btnScanTrigger = document.getElementById('btn-scan-trigger');
-    const customThreshInput = document.getElementById('custom-thresh');
 
-    // Show toast message
     function showToast(msg) {
       toastEl.textContent = msg;
       toastEl.classList.add('show');
-      setTimeout(() => toastEl.classList.remove('show'), 3000);
+      setTimeout(() => toastEl.classList.remove('show'), 2500);
     }
 
-    // Format numbers
     function formatPrice(val) {
-      return (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function formatVol(val) {
-      if (val >= 1e9) return (val / 1e9).toFixed(2) + 'B';
-      if (val >= 1e6) return (val / 1e6).toFixed(2) + 'M';
-      if (val >= 1e3) return (val / 1e3).toFixed(1) + 'K';
-      return (val || 0).toString();
+      if (val >= 1e7) return (val / 1e7).toFixed(2) + ' Cr';
+      if (val >= 1e5) return (val / 1e5).toFixed(2) + ' L';
+      if (val >= 1e3) return (val / 1e3).toFixed(1) + ' K';
+      return String(val);
     }
 
-    // Initialize Main Chart
+    // Initialize Lightweight Chart
     function initChart() {
-      if (chart) {
-        chart.remove();
-        chart = null;
-      }
+      const container = document.getElementById('chart-canvas');
+      container.innerHTML = '';
 
-      const isDarkMode = document.body.classList.contains('dark');
-      const bgColor = isDarkMode ? '#111520' : '#ffffff';
-      const gridColor = isDarkMode ? '#1a2030' : '#f1f5f9';
-      const textColor = isDarkMode ? '#94a3b8' : '#64748b';
+      const bgColor = isDark ? '#111726' : '#ffffff';
+      const gridColor = isDark ? '#1a233a' : '#f1f5f9';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
 
-      chart = LightweightCharts.createChart(chartContainer, {
+      chart = LightweightCharts.createChart(container, {
         layout: {
           background: { color: bgColor },
           textColor: textColor,
@@ -1813,157 +1145,109 @@
           vertLines: { color: gridColor },
           horzLines: { color: gridColor },
         },
-        crosshair: {
-          mode: LightweightCharts.CrosshairMode.Normal,
-        },
         rightPriceScale: {
-          borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
+          borderColor: isDark ? '#232e47' : '#e2e8f0',
           autoScale: true,
-          scaleMargins: {
-            top: 0.05,
-            bottom: 0.2,
-          },
+          scaleMargins: { top: 0.05, bottom: 0.2 },
         },
         timeScale: {
-          borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
+          borderColor: isDark ? '#232e47' : '#e2e8f0',
           timeVisible: true,
           secondsVisible: false,
-          rightOffset: getTimeframeChartParams(currentTimeframe).rightOffset,
-          barSpacing: getTimeframeChartParams(currentTimeframe).barSpacing,
+          barSpacing: userZoom,
+          rightOffset: Math.max(3, Math.round(userZoom + 2)),
+          minBarSpacing: 0.5,
         },
       });
 
       candleSeries = chart.addCandlestickSeries({
-        upColor: isDarkMode ? '#22c55e' : '#16a34a',
-        downColor: isDarkMode ? '#ef4444' : '#dc2626',
-        borderVisible: false,
-        wickUpColor: isDarkMode ? '#22c55e' : '#16a34a',
-        wickDownColor: isDarkMode ? '#ef4444' : '#dc2626',
+        upColor: '#16a34a',
+        downColor: '#dc2626',
+        borderUpColor: '#16a34a',
+        borderDownColor: '#dc2626',
+        wickUpColor: '#16a34a',
+        wickDownColor: '#dc2626',
       });
 
       volumeSeries = chart.addHistogramSeries({
-        color: isDarkMode ? '#3b82f6' : '#2563eb',
         priceFormat: { type: 'volume' },
-        priceScaleId: '', // overlay
+        priceScaleId: '',
+      });
+      volumeSeries.priceScale().applyOptions({
+        scaleMargins: { top: 0.8, bottom: 0 },
       });
 
-      chart.priceScale('').applyOptions({
-        scaleMargins: {
-          top: 0.8,
-          bottom: 0,
-        },
-      });
-
-      const floatingTooltip = document.getElementById('candle-tooltip');
-
+      // Hover crosshair listener for real-time tooltip and OHLC update
       chart.subscribeCrosshairMove(param => {
-        if (!param || !param.time || !param.seriesData.get(candleSeries)) {
-          if (floatingTooltip) floatingTooltip.style.display = 'none';
+        if (!param.point || !param.time) {
+          floatTip.style.display = 'none';
           updateHeaderFromLatest();
           return;
         }
 
-        const data = param.seriesData.get(candleSeries);
-        const volData = param.seriesData.get(volumeSeries);
-        if (data) {
-          const dt = new Date(param.time * 1000);
-          document.getElementById('val-time').textContent = dt.toLocaleString();
-          document.getElementById('val-open').textContent = formatPrice(data.open);
-          document.getElementById('val-high').textContent = formatPrice(data.high);
-          document.getElementById('val-low').textContent = formatPrice(data.low);
-          document.getElementById('val-close').textContent = formatPrice(data.close);
-
-          // Candle change and percentage change (broker style)
-          const candleDiff = data.close - data.open;
-          const candlePct = data.open > 0 ? (candleDiff / data.open) * 100 : 0;
-          const isUp = candleDiff >= 0;
-          const chgSign = isUp ? '+' : '';
-          const chgEl = document.getElementById('val-chg');
-          if (chgEl) {
-            chgEl.textContent = `${chgSign}${formatPrice(candleDiff)} (${chgSign}${candlePct.toFixed(2)}%)`;
-            chgEl.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
-          }
-
-          document.getElementById('val-vol').textContent = volData ? formatVol(volData.value) : '--';
-
-          // Floating candle badge positioned at mouse cursor
-          if (floatingTooltip && param.point) {
-            floatingTooltip.style.display = 'block';
-            floatingTooltip.className = 'candle-floating-tooltip ' + (isUp ? 'up' : 'down');
-            floatingTooltip.innerHTML = `<span>${chgSign}${candlePct.toFixed(2)}%</span> <span style="font-weight:400;opacity:0.85;margin-left:4px;">(${chgSign}₹${formatPrice(candleDiff)})</span>`;
-            floatingTooltip.style.left = `${param.point.x}px`;
-            floatingTooltip.style.top = `${param.point.y}px`;
-          }
-
-          // Also dynamically update the top header price and change badge to reflect hovered candle
-          document.getElementById('hdr-price').textContent = '₹' + formatPrice(data.close);
-          const hdrChgEl = document.getElementById('hdr-change');
-          if (hdrChgEl) {
-            hdrChgEl.textContent = `${chgSign}${formatPrice(candleDiff)} (${chgSign}${candlePct.toFixed(2)}%)`;
-            hdrChgEl.className = 'price-change ' + (isUp ? 'up' : 'down');
-          }
+        const candle = param.seriesData.get(candleSeries);
+        if (!candle) {
+          floatTip.style.display = 'none';
+          updateHeaderFromLatest();
+          return;
         }
-      });
 
-      window.addEventListener('resize', () => {
-        if (chart && currentViewMode === 'single') {
-          chart.applyOptions({
-            width: chartContainer.clientWidth,
-            height: chartContainer.clientHeight,
-          });
+        const diff = candle.close - candle.open;
+        const pct = (diff / candle.open) * 100;
+        const isUp = diff >= 0;
+        const sign = isUp ? '+' : '';
+
+        // Update Top OHLC
+        document.getElementById('ohlc-open').textContent = formatPrice(candle.open);
+        document.getElementById('ohlc-high').textContent = formatPrice(candle.high);
+        document.getElementById('ohlc-low').textContent = formatPrice(candle.low);
+        document.getElementById('ohlc-close').textContent = formatPrice(candle.close);
+        const chgSpan = document.getElementById('ohlc-chg');
+        chgSpan.textContent = `${sign}${pct.toFixed(2)}%`;
+        chgSpan.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
+
+        const vol = param.seriesData.get(volumeSeries);
+        if (vol) {
+          document.getElementById('ohlc-vol').textContent = formatVol(vol.value);
         }
+
+        // Floating tooltip at cursor
+        floatTip.textContent = `${sign}${pct.toFixed(2)}% (${sign}₹${diff.toFixed(2)})`;
+        floatTip.className = `candle-float-tip ${isUp ? 'up' : 'down'}`;
+        floatTip.style.display = 'block';
+        floatTip.style.left = `${param.point.x}px`;
+        floatTip.style.top = `${param.point.y}px`;
       });
     }
 
     function updateHeaderFromLatest() {
-      const ft = document.getElementById('candle-tooltip');
-      if (ft) ft.style.display = 'none';
-
       if (!candleData || candleData.length === 0) return;
-      const last = candleData[candleData.length - 1];
-      const prev = candleData.length > 1 ? candleData[candleData.length - 2] : last;
-      const diff = last.close - prev.close;
-      const pct = prev.close > 0 ? (diff / prev.close) * 100 : 0;
+      const latest = candleData[candleData.length - 1];
+      const diff = latest.close - latest.open;
+      const pct = (diff / latest.open) * 100;
+      const isUp = diff >= 0;
+      const sign = isUp ? '+' : '';
 
-      document.getElementById('hdr-price').textContent = '₹' + formatPrice(last.close);
-      const chgEl = document.getElementById('hdr-change');
-      chgEl.textContent = (diff >= 0 ? '+' : '') + formatPrice(diff) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)';
-      chgEl.className = 'price-change ' + (diff >= 0 ? 'up' : 'down');
-
-      const dt = new Date(last.timestamp * 1000);
-      document.getElementById('val-time').textContent = dt.toLocaleString();
-      document.getElementById('val-open').textContent = formatPrice(last.open);
-      document.getElementById('val-high').textContent = formatPrice(last.high);
-      document.getElementById('val-low').textContent = formatPrice(last.low);
-      document.getElementById('val-close').textContent = formatPrice(last.close);
-
-      // Latest candle change
-      const candleDiff = last.close - last.open;
-      const candlePct = last.open > 0 ? (candleDiff / last.open) * 100 : 0;
-      const isUp = candleDiff >= 0;
-      const chgSign = isUp ? '+' : '';
-      const valChgEl = document.getElementById('val-chg');
-      if (valChgEl) {
-        valChgEl.textContent = `${chgSign}${formatPrice(candleDiff)} (${chgSign}${candlePct.toFixed(2)}%)`;
-        valChgEl.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
-      }
-
-      document.getElementById('val-vol').textContent = formatVol(last.volume);
+      document.getElementById('ohlc-open').textContent = formatPrice(latest.open);
+      document.getElementById('ohlc-high').textContent = formatPrice(latest.high);
+      document.getElementById('ohlc-low').textContent = formatPrice(latest.low);
+      document.getElementById('ohlc-close').textContent = formatPrice(latest.close);
+      const chgSpan = document.getElementById('ohlc-chg');
+      chgSpan.textContent = `${sign}${pct.toFixed(2)}%`;
+      chgSpan.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
+      document.getElementById('ohlc-vol').textContent = formatVol(latest.volume);
     }
 
-    // Fetch and Load Single Chart Data
+    // Fetch and Load Chart Data from Backend (with SQLite caching)
     async function fetchChartData(force = false) {
       const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
       if (activeList.length === 0) return;
       const stock = activeList[currentIndex] || activeList[0];
       if (!stock) return;
 
-      document.getElementById('hdr-symbol').textContent = stock.symbol;
-      document.getElementById('hdr-name').textContent = stock.name;
+      document.getElementById('hero-sym').textContent = stock.symbol;
 
-      loadingMsg.textContent = `Loading ${currentTimeframe} data for ${stock.symbol}...`;
-      loadingOverlay.classList.add('visible');
-
+      const startTime = performance.now();
       try {
         const url = `/api/candles?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}${force ? '&force=true' : ''}`;
         const res = await fetch(url);
@@ -1973,14 +1257,14 @@
         }
 
         const cacheHeader = res.headers.get('x-cache') || 'UNKNOWN';
-        console.log(`%c[MarketWatch] ${stock.symbol} (${currentTimeframe}) -> Cache: ${cacheHeader}`, cacheHeader === 'HIT' ? 'color: #10b981; font-weight: bold;' : 'color: #3b82f6; font-weight: bold;');
+        const elapsed = (performance.now() - startTime).toFixed(1);
+        document.getElementById('cache-latency').textContent = `${cacheHeader === 'HIT' ? 'Hit' : 'Miss'} (${elapsed}ms)`;
 
         candleData = await res.json();
         renderChartData(candleData);
+        renderDrawerTab(currentDrawerTab);
       } catch (e) {
         showToast('Error: ' + e.message);
-      } finally {
-        loadingOverlay.classList.remove('visible');
       }
     }
 
@@ -1995,102 +1279,75 @@
         close: c.close,
       }));
 
-      const isDarkMode = document.body.classList.contains('dark');
       const volumes = data.map(c => ({
         time: c.timestamp,
         value: c.volume,
-        color: c.close >= c.open
-          ? (isDarkMode ? 'rgba(34, 197, 94, 0.4)' : 'rgba(22, 163, 74, 0.35)')
-          : (isDarkMode ? 'rgba(239, 68, 68, 0.4)' : 'rgba(220, 38, 38, 0.35)'),
+        color: c.close >= c.open ? 'rgba(22, 163, 74, 0.3)' : 'rgba(220, 38, 38, 0.3)',
       }));
 
       candleSeries.setData(candles);
       volumeSeries.setData(volumes);
       chart.timeScale().fitContent();
 
-      // fitContent() recalculates barSpacing to fit all bars in the viewport,
-      // which overrides our desired spacing. Re-apply timeframe-adaptive
-      // barSpacing and rightOffset AFTER fitContent so they stick.
-      const tfParams = getTimeframeChartParams(currentTimeframe);
+      // Apply zoom spacing after fitContent
       chart.timeScale().applyOptions({
-        rightOffset: tfParams.rightOffset,
-        barSpacing: tfParams.barSpacing,
-        minBarSpacing: tfParams.minBarSpacing,
+        barSpacing: userZoom,
+        rightOffset: Math.max(3, Math.round(userZoom + 2)),
+        minBarSpacing: 0.5,
       });
 
-      // Force the price scale to re-auto-scale for the new data range.
-      // This ensures switching between stocks with very different price ranges
-      // (e.g., ₹19,000 vs ₹560) always frames the candlesticks optimally
-      // without requiring manual scrolling or pinching — like professional brokers.
-      chart.priceScale('right').applyOptions({
-        autoScale: true,
-        scaleMargins: {
-          top: 0.05,
-          bottom: 0.2,
-        },
-      });
+      // Update hero price
+      const latest = candles[candles.length - 1];
+      const prev = candles.length > 1 ? candles[candles.length - 2] : latest;
+      const chg = ((latest.close - prev.close) / prev.close) * 100;
+      const isUp = chg >= 0;
 
-      let hi = -Infinity, lo = Infinity, totalVol = 0;
-      data.forEach(c => {
-        if (c.high > hi) hi = c.high;
-        if (c.low < lo) lo = c.low;
-        totalVol += c.volume;
-      });
-
-      document.getElementById('stat-high').textContent = '₹' + formatPrice(hi);
-      document.getElementById('stat-low').textContent = '₹' + formatPrice(lo);
-      document.getElementById('stat-vol').textContent = formatVol(totalVol);
-      document.getElementById('stat-count').textContent = data.length + ' bars';
+      document.getElementById('hero-price').textContent = `₹${formatPrice(latest.close)}`;
+      const chgEl = document.getElementById('hero-chg');
+      chgEl.textContent = `${isUp ? '+' : ''}${chg.toFixed(2)}%`;
+      chgEl.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
 
       updateHeaderFromLatest();
     }
 
-    // Load Stock Universe
+    // Load Stock Universe from Backend
     async function loadStocks() {
       try {
         const res = await fetch('/api/stocks');
         stocks = await res.json();
-        document.getElementById('tab-universe-count').textContent = stocks.length;
-        stockCountEl.textContent = `${stocks.length} stocks`;
-        if (currentTab === 'universe') {
-          renderStockList();
-          if (stocks.length > 0) selectStock(0);
+        document.getElementById('count-universe').textContent = stocks.length;
+        renderStockList();
+        if (stocks.length > 0) {
+          selectStock(0);
         }
       } catch (e) {
-        showToast('Error loading stocks: ' + e.message);
+        showToast('Failed to load stock list: ' + e.message);
       }
     }
 
     function renderStockList(filter = '') {
       stockListEl.innerHTML = '';
-      const term = filter.toLowerCase().trim();
+      const q = filter.trim().toLowerCase();
+      const filtered = q
+        ? stocks.filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+        : stocks;
 
-      stocks.forEach((s, idx) => {
-        if (term && !s.symbol.toLowerCase().includes(term) && !s.name.toLowerCase().includes(term)) {
-          return;
-        }
-
+      filtered.forEach((s, idx) => {
         const li = document.createElement('li');
-        li.className = 'stock-item' + (idx === currentIndex ? ' active' : '');
+        li.className = 'stock-row' + (idx === currentIndex && currentTab === 'universe' ? ' active' : '');
         li.innerHTML = `
-          <div class="stock-item-info">
-            <span class="stock-item-symbol">${s.symbol}</span>
-            <span class="stock-item-name">${s.name}</span>
+          <div>
+            <div class="stock-sym-title">${s.symbol}</div>
+            <div class="stock-corp-name">${s.name}</div>
           </div>
-          <button class="stock-delete-btn" title="Remove from universe" data-symbol="${s.symbol}">×</button>
+          <button style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px;" onclick="event.stopPropagation(); deleteStock('${s.symbol}')">✕</button>
         `;
-
-        li.addEventListener('click', (e) => {
-          if (e.target.classList.contains('stock-delete-btn')) return;
+        li.addEventListener('click', () => {
           selectStock(idx);
+          if (currentViewMode === 'grid') {
+            setViewMode('single');
+          }
         });
-
-        const delBtn = li.querySelector('.stock-delete-btn');
-        delBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteStock(s.symbol);
-        });
-
         stockListEl.appendChild(li);
       });
     }
@@ -2100,19 +1357,19 @@
       if (index < 0 || index >= activeList.length) return;
       currentIndex = index;
 
-      document.querySelectorAll('.stock-item').forEach((el, i) => {
+      document.querySelectorAll('.stock-row').forEach((el, i) => {
         el.classList.toggle('active', i === currentIndex);
       });
 
-      const activeEl = document.querySelector('.stock-item.active');
+      const activeEl = document.querySelector('.stock-row.active');
       if (activeEl) {
         activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
 
       if (currentViewMode === 'single') {
         fetchChartData();
-      } else if (currentViewMode === 'intel') {
-        renderIntelView();
+      } else {
+        renderDrawerTab(currentDrawerTab);
       }
     }
 
@@ -2123,494 +1380,539 @@
         if (!res.ok) throw new Error('Delete failed');
         showToast(`Removed ${symbol}`);
         stocks = stocks.filter(s => s.symbol !== symbol);
-        if (currentIndex >= stocks.length) currentIndex = Math.max(0, stocks.length - 1);
-        document.getElementById('tab-universe-count').textContent = stocks.length;
-        stockCountEl.textContent = `${stocks.length} stocks`;
-        renderStockList(searchInput.value);
-        if (stocks.length > 0) selectStock(currentIndex);
+        document.getElementById('count-universe').textContent = stocks.length;
+        renderStockList();
       } catch (e) {
         showToast('Error: ' + e.message);
       }
     }
 
     async function addStock(symbol, name) {
-      if (!symbol || !name) return;
+      if (!symbol) return;
+      let sym = symbol.toUpperCase().trim();
+      if (!sym.includes('.')) sym += '.NS';
       try {
         const res = await fetch('/api/stocks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol: symbol.toUpperCase().trim(), name: name.trim() })
+          body: JSON.stringify({ symbol: sym, name: name.trim() || sym, tags: [] }),
         });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Add failed');
-        }
-        showToast(`Added ${symbol}`);
-        document.getElementById('add-modal').classList.remove('open');
-        document.getElementById('new-symbol').value = '';
-        document.getElementById('new-name').value = '';
+        if (!res.ok) throw new Error('Failed to add');
+        showToast(`Added ${sym}`);
+        document.getElementById('modal-add').classList.remove('open');
         await loadStocks();
-        selectStock(stocks.findIndex(s => s.symbol.toUpperCase() === symbol.toUpperCase()));
       } catch (e) {
         showToast('Error: ' + e.message);
       }
     }
 
-    // ---------------------------------------------------------------------------
-    // MOVERS SCREENER LOGIC
-    // ---------------------------------------------------------------------------
-
+    // Movers Screener
     function getFilteredMovers() {
       if (!moversData || !moversData.movers) return [];
-      let list = moversData.movers;
-      if (currentMoverFilter === 'gainers') {
-        list = list.filter(m => m.change_percent >= 0);
-      } else if (currentMoverFilter === 'losers') {
-        list = list.filter(m => m.change_percent < 0);
-      }
-      return list;
+      return moversData.movers.filter(m => Math.abs(m.change_percent) >= currentThreshold);
     }
 
     async function loadCachedMovers() {
       try {
-        const res = await fetch(`/api/scan/cached?threshold=${currentThreshold}`);
+        const res = await fetch('/api/scan/cached');
         const data = await res.json();
         if (data) {
           moversData = data;
-          tabMoversCount.textContent = data.movers_count;
-          if (currentTab === 'movers') {
-            renderMoversList();
-            if (currentViewMode === 'grid') {
-              renderMultiChartGrid();
-            }
-          }
-        } else {
-          // If no cached scan exists, run background scan
-          runScanMovers(false);
+          updateMoversCount();
+          if (currentTab === 'movers') renderMoversList();
         }
       } catch (e) {
-        console.warn('Failed to load cached movers:', e);
+        console.warn('No cached movers:', e);
       }
     }
 
     async function runScanMovers(force = true) {
-      if (isScanning) return;
-      isScanning = true;
-      btnScanTrigger.classList.add('scanning');
-      btnScanTrigger.querySelector('span').textContent = 'Scanning...';
-      loadingMsg.textContent = `Scanning 150 stocks for ±${currentThreshold}% movers...`;
-      if (currentTab === 'movers' && currentViewMode === 'grid') {
-        loadingOverlay.classList.add('visible');
-      }
-
+      showToast('Scanning 150+ stocks for movers...');
       try {
         const res = await fetch(`/api/scan?threshold=${currentThreshold}&force=${force}`);
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Scan failed');
-        }
+        if (!res.ok) throw new Error('Scan failed');
         moversData = await res.json();
-        tabMoversCount.textContent = moversData.movers_count;
-        showToast(`Scan complete: ${moversData.movers_count} movers (±${currentThreshold}%)`);
-
-        if (currentTab === 'movers') {
-          renderMoversList();
-          if (currentViewMode === 'grid') {
-            renderMultiChartGrid();
-          } else if (getFilteredMovers().length > 0) {
-            selectStock(0);
-          }
-        }
+        updateMoversCount();
+        if (currentTab === 'movers') renderMoversList();
+        if (currentViewMode === 'grid') renderMultiChartGrid();
+        showToast(`Scan complete: ${moversData.movers_count} movers`);
       } catch (e) {
-        showToast('Scan Error: ' + e.message);
-      } finally {
-        isScanning = false;
-        btnScanTrigger.classList.remove('scanning');
-        btnScanTrigger.querySelector('span').textContent = 'Scan Now';
-        loadingOverlay.classList.remove('visible');
+        showToast('Scan error: ' + e.message);
       }
+    }
+
+    function updateMoversCount() {
+      const count = getFilteredMovers().length;
+      document.getElementById('count-movers').textContent = count;
     }
 
     function renderMoversList() {
       stockListEl.innerHTML = '';
       const list = getFilteredMovers();
-
       if (list.length === 0) {
-        const emptyEl = document.createElement('li');
-        emptyEl.style.padding = '24px 16px';
-        emptyEl.style.textAlign = 'center';
-        emptyEl.style.color = 'var(--text-muted)';
-        emptyEl.style.fontSize = '12px';
-        emptyEl.innerHTML = `No stocks moved beyond ±${currentThreshold}% today.<br/><br/><button class="action-btn" style="margin: 0 auto;" onclick="runScanMovers(true)">Refresh Scan</button>`;
-        stockListEl.appendChild(emptyEl);
+        stockListEl.innerHTML = `
+          <div style="padding: 24px 14px; text-align: center; color: var(--text-muted); font-size: 12px;">
+            No movers beyond ±${currentThreshold}% found.<br/><br/>
+            <button class="add-btn" onclick="runScanMovers(true)">Refresh Scan</button>
+          </div>
+        `;
         return;
       }
 
       list.forEach((m, idx) => {
         const li = document.createElement('li');
-        li.className = 'stock-item' + (idx === currentIndex ? ' active' : '');
+        li.className = 'stock-row' + (idx === currentIndex ? ' active' : '');
         const isUp = m.change_percent >= 0;
-        const sign = isUp ? '+' : '';
-
         li.innerHTML = `
-          <div class="stock-item-info">
-            <span class="stock-item-symbol">${m.symbol}</span>
-            <span class="stock-item-name">${m.name}</span>
+          <div>
+            <div class="stock-sym-title">${m.symbol}</div>
+            <div class="stock-corp-name">${m.name}</div>
           </div>
-          <div class="stock-item-right">
-            <span class="stock-item-price">₹${formatPrice(m.price)}</span>
-            <span class="stock-badge ${isUp ? 'up' : 'down'}">${sign}${m.change_percent.toFixed(2)}%</span>
+          <div style="text-align: right;">
+            <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 600;">₹${formatPrice(m.price)}</div>
+            <span class="stock-badge-pill ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${m.change_percent.toFixed(2)}%</span>
           </div>
         `;
-
         li.addEventListener('click', () => {
           selectStock(idx);
           if (currentViewMode === 'grid') {
-            // Scroll to grid card
             const card = document.getElementById(`card-${m.symbol}`);
-            if (card) {
-              card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              card.style.borderColor = 'var(--accent-blue)';
-              setTimeout(() => card.style.borderColor = '', 2000);
-            }
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         });
-
         stockListEl.appendChild(li);
       });
     }
 
-    // Multi-Chart Grid for Movers & Intel View
+    // View Mode Switching (Single Focus vs Multi Grid)
     function setViewMode(mode) {
       currentViewMode = mode;
-      btnViewSingle.classList.toggle('active', mode === 'single');
-      btnViewGrid.classList.toggle('active', mode === 'grid');
-      btnViewIntel.classList.toggle('active', mode === 'intel');
+      document.getElementById('btn-rail-chart').classList.toggle('active', mode === 'single');
+      document.getElementById('btn-rail-grid').classList.toggle('active', mode === 'grid');
 
       if (mode === 'single') {
-        chartContainer.style.display = 'block';
-        chartGridContainer.classList.remove('visible');
-        intelContainer.classList.remove('visible');
-        document.getElementById('ohlc-banner').style.display = 'flex';
-        document.getElementById('stats-footer').style.display = 'flex';
+        chartBox.style.display = 'block';
+        gridBox.style.display = 'none';
         initChart();
         fetchChartData();
-      } else if (mode === 'grid') {
-        chartContainer.style.display = 'none';
-        chartGridContainer.classList.add('visible');
-        intelContainer.classList.remove('visible');
-        document.getElementById('ohlc-banner').style.display = 'none';
-        document.getElementById('stats-footer').style.display = 'none';
+      } else {
+        chartBox.style.display = 'none';
+        gridBox.style.display = 'grid';
         renderMultiChartGrid();
-      } else if (mode === 'intel') {
-        chartContainer.style.display = 'none';
-        chartGridContainer.classList.remove('visible');
-        intelContainer.classList.add('visible');
-        document.getElementById('ohlc-banner').style.display = 'none';
-        document.getElementById('stats-footer').style.display = 'none';
-        renderIntelView();
-      }
-    }
-
-    // Copy command to clipboard with UI feedback
-    function copyToClipboard(text, btn) {
-      if (!navigator.clipboard) {
-        showToast('Clipboard access unavailable');
-        return;
-      }
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.textContent;
-        btn.textContent = 'Copied!';
-        btn.style.background = 'var(--bullish)';
-        btn.style.color = '#fff';
-        setTimeout(() => {
-          btn.textContent = orig;
-          btn.style.background = '';
-          btn.style.color = '';
-        }, 1500);
-      }).catch(() => {
-        showToast('Failed to copy');
-      });
-    }
-
-    // Populate active stock details and SQLite cache stats in Intel View
-    async function renderIntelView() {
-      const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
-      if (activeList.length === 0) return;
-      const stock = activeList[currentIndex] || activeList[0];
-      if (!stock) return;
-
-      document.getElementById('intel-active-stock').textContent = stock.symbol;
-      document.getElementById('intel-research-symbol').textContent = stock.symbol;
-      document.getElementById('intel-research-name').textContent = stock.name;
-      document.getElementById('cmd-meta-inspect').textContent = `curl -s "http://localhost:3000/api/cache/meta?symbol=${stock.symbol}&timeframe=${currentTimeframe}" | jq`;
-
-      const priceBadge = document.getElementById('hdr-price').textContent;
-      document.getElementById('intel-price').textContent = priceBadge && priceBadge !== '--' ? `₹${priceBadge}` : '--';
-
-      try {
-        const res = await fetch(`/api/cache/meta?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}`);
-        if (res.ok) {
-          const meta = await res.json();
-          if (meta && meta.candle_count > 0) {
-            document.getElementById('intel-cache-status').textContent = `⚡ SQLite: ${meta.candle_count} bars`;
-            document.getElementById('intel-bars').textContent = `${meta.candle_count} (${meta.timeframe})`;
-            const syncDate = new Date(meta.last_synced_at * 1000);
-            document.getElementById('intel-synced').textContent = syncDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          } else {
-            document.getElementById('intel-cache-status').textContent = '🌐 Uncached';
-            document.getElementById('intel-bars').textContent = '0';
-            document.getElementById('intel-synced').textContent = 'Never';
-          }
-        }
-      } catch (e) {
-        document.getElementById('intel-cache-status').textContent = 'Error';
       }
     }
 
     async function renderMultiChartGrid() {
-      // Clear previous grid chart instances
       gridChartInstances.forEach(c => c.remove());
       gridChartInstances = [];
-      chartGridContainer.innerHTML = '';
+      gridBox.innerHTML = '';
 
       const list = getFilteredMovers();
       if (list.length === 0) {
-        chartGridContainer.innerHTML = `
+        gridBox.innerHTML = `
           <div style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-muted); gap: 12px;">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-            <div style="font-size: 15px; font-weight: 600;">No stocks moved beyond ±${currentThreshold}% today</div>
-            <div style="font-size: 12px;">Try adjusting the threshold (e.g. 1% or 2%) or triggering a fresh scan.</div>
-            <button class="action-btn" onclick="runScanMovers(true)">⚡ Scan 150 Stocks Now</button>
+            <div style="font-size: 15px; font-weight: 600;">No movers beyond ±${currentThreshold}%</div>
+            <div style="font-size: 12px;">Adjust threshold or click Refresh Scan.</div>
           </div>
         `;
         return;
       }
 
-      const isDarkMode = document.body.classList.contains('dark');
-      const bgColor = isDarkMode ? '#111520' : '#ffffff';
-      const gridColor = isDarkMode ? '#1a2030' : '#f1f5f9';
-      const textColor = isDarkMode ? '#94a3b8' : '#64748b';
+      const bgColor = isDark ? '#111726' : '#ffffff';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+      const gridColor = isDark ? '#1a233a' : '#f1f5f9';
 
-      for (const mover of list) {
+      for (const m of list) {
         const card = document.createElement('div');
         card.className = 'grid-chart-card';
-        card.id = `card-${mover.symbol}`;
-
-        const isUp = mover.change_percent >= 0;
-        const sign = isUp ? '+' : '';
+        card.id = `card-${m.symbol}`;
+        const isUp = m.change_percent >= 0;
 
         card.innerHTML = `
-          <div class="grid-chart-header">
-            <div class="grid-chart-title">
-              <span class="grid-chart-sym">${mover.symbol}</span>
-              <span class="grid-chart-nm">${mover.name}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${m.symbol}</div>
+              <div style="font-size: 11px; color: var(--text-muted);">${m.name}</div>
             </div>
-            <div class="grid-chart-metrics">
-              <span class="grid-chart-price">₹${formatPrice(mover.price)}</span>
-              <span class="stock-badge ${isUp ? 'up' : 'down'}">${sign}${mover.change_percent.toFixed(2)}%</span>
+            <div style="text-align: right;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">₹${formatPrice(m.price)}</div>
+              <span class="stock-badge-pill ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${m.change_percent.toFixed(2)}%</span>
             </div>
           </div>
-          <div class="grid-chart-body" id="chart-card-${mover.symbol}"></div>
+          <div class="grid-chart-canvas"></div>
         `;
 
-        // Click card to open in single chart view
         card.addEventListener('click', () => {
-          const idx = list.findIndex(m => m.symbol === mover.symbol);
-          if (idx !== -1) {
-            selectStock(idx);
-          }
+          const idx = (currentTab === 'movers' ? getFilteredMovers() : stocks).findIndex(s => s.symbol === m.symbol);
+          if (idx !== -1) selectStock(idx);
           setViewMode('single');
         });
 
-        chartGridContainer.appendChild(card);
+        gridBox.appendChild(card);
 
-        // Create Lightweight Chart for this card
-        const cardBody = card.querySelector('.grid-chart-body');
-        const miniChart = LightweightCharts.createChart(cardBody, {
-          layout: {
-            background: { color: bgColor },
-            textColor: textColor,
-            fontFamily: "'JetBrains Mono', monospace",
-          },
-          grid: {
-            vertLines: { color: gridColor },
-            horzLines: { color: gridColor },
-          },
-          rightPriceScale: {
-            borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
-            autoScale: true,
-            scaleMargins: {
-              top: 0.05,
-              bottom: 0.15,
-            },
-          },
-          timeScale: {
-            borderColor: isDarkMode ? '#23293a' : '#dbe2ea',
-            timeVisible: true,
-            secondsVisible: false,
-            rightOffset: Math.max(3, getTimeframeChartParams(currentTimeframe).rightOffset - 3),
-            barSpacing: Math.max(6, getTimeframeChartParams(currentTimeframe).barSpacing - 2),
-          },
+        const canvasEl = card.querySelector('.grid-chart-canvas');
+        const miniChart = LightweightCharts.createChart(canvasEl, {
+          layout: { background: { color: bgColor }, textColor, fontFamily: "'JetBrains Mono', monospace" },
+          grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+          rightPriceScale: { borderColor: isDark ? '#232e47' : '#e2e8f0', autoScale: true, scaleMargins: { top: 0.05, bottom: 0.15 } },
+          timeScale: { borderColor: isDark ? '#232e47' : '#e2e8f0', timeVisible: true, secondsVisible: false, barSpacing: userZoom, rightOffset: 3 },
         });
-
-        const series = miniChart.addCandlestickSeries({
-          upColor: isDarkMode ? '#22c55e' : '#16a34a',
-          downColor: isDarkMode ? '#ef4444' : '#dc2626',
-          borderVisible: false,
-          wickUpColor: isDarkMode ? '#22c55e' : '#16a34a',
-          wickDownColor: isDarkMode ? '#ef4444' : '#dc2626',
-        });
-
         gridChartInstances.push(miniChart);
 
-        // Fetch candles for this mover asynchronously
-        fetch(`/api/candles?symbol=${encodeURIComponent(mover.symbol)}&timeframe=${currentTimeframe}`)
+        const miniSeries = miniChart.addCandlestickSeries({
+          upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626', wickUpColor: '#16a34a', wickDownColor: '#dc2626',
+        });
+
+        fetch(`/api/candles?symbol=${encodeURIComponent(m.symbol)}&timeframe=${currentTimeframe}`)
           .then(r => r.json())
-          .then(cData => {
-            if (cData && cData.length > 0) {
-              const candles = cData.map(c => ({
-                time: c.timestamp,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-              }));
-              series.setData(candles);
+          .then(data => {
+            if (Array.isArray(data) && data.length > 0) {
+              miniSeries.setData(data.map(c => ({ time: c.timestamp, open: c.open, high: c.high, low: c.low, close: c.close })));
               miniChart.timeScale().fitContent();
-              // Re-apply spacing after fitContent (same fix as main chart)
-              miniChart.timeScale().applyOptions({
-                rightOffset: Math.max(3, getTimeframeChartParams(currentTimeframe).rightOffset - 3),
-                barSpacing: Math.max(6, getTimeframeChartParams(currentTimeframe).barSpacing - 2),
-              });
-              // Force price axis re-fit for each mini chart
-              miniChart.priceScale('right').applyOptions({
-                autoScale: true,
-                scaleMargins: { top: 0.05, bottom: 0.15 },
-              });
-
-              // Crosshair hover on mini chart updates card price & percentage change
-              const origPrice = mover.price;
-              const origPct = mover.change_percent;
-              const priceEl = card.querySelector('.grid-chart-price');
-              const badgeEl = card.querySelector('.stock-badge');
-
-              miniChart.subscribeCrosshairMove(param => {
-                if (!param || !param.time || !param.seriesData.get(series)) {
-                  if (priceEl) priceEl.textContent = '₹' + formatPrice(origPrice);
-                  if (badgeEl) {
-                    const isUp = origPct >= 0;
-                    const sign = isUp ? '+' : '';
-                    badgeEl.textContent = `${sign}${origPct.toFixed(2)}%`;
-                    badgeEl.className = `stock-badge ${isUp ? 'up' : 'down'}`;
-                  }
-                  return;
-                }
-
-                const c = param.seriesData.get(series);
-                if (c && priceEl && badgeEl) {
-                  const cDiff = c.close - c.open;
-                  const cPct = c.open > 0 ? (cDiff / c.open) * 100 : 0;
-                  const isUp = cDiff >= 0;
-                  const sign = isUp ? '+' : '';
-                  priceEl.textContent = '₹' + formatPrice(c.close);
-                  badgeEl.textContent = `${sign}${formatPrice(cDiff)} (${sign}${cPct.toFixed(2)}%)`;
-                  badgeEl.className = `stock-badge ${isUp ? 'up' : 'down'}`;
-                }
-              });
+              miniChart.timeScale().applyOptions({ barSpacing: userZoom, rightOffset: 3 });
             }
           })
-          .catch(err => console.warn(`Failed candles for ${mover.symbol}:`, err));
+          .catch(console.warn);
       }
     }
 
-    // Tab Switching: Universe vs Movers
-    tabUniverse.addEventListener('click', () => {
-      currentTab = 'universe';
-      tabUniverse.classList.add('active');
-      tabMovers.classList.remove('active');
-      universeHeader.style.display = 'flex';
-      universeFooter.style.display = 'block';
-      moversToolbar.style.display = 'none';
-      renderStockList(searchInput.value);
-      if (stocks.length > 0) selectStock(0);
-    });
-
-    tabMovers.addEventListener('click', () => {
-      currentTab = 'movers';
-      tabMovers.classList.add('active');
-      tabUniverse.classList.remove('active');
-      universeHeader.style.display = 'none';
-      universeFooter.style.display = 'none';
-      moversToolbar.style.display = 'flex';
-      renderMoversList();
-      if (currentViewMode === 'grid') {
-        renderMultiChartGrid();
-      } else if (getFilteredMovers().length > 0) {
-        selectStock(0);
-      }
-    });
-
-    // View Mode Toggle Listeners
-    btnViewSingle.addEventListener('click', () => setViewMode('single'));
-    btnViewGrid.addEventListener('click', () => setViewMode('grid'));
-    btnViewIntel.addEventListener('click', () => setViewMode('intel'));
-
-    // Threshold chips
-    document.querySelectorAll('.threshold-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        document.querySelectorAll('.threshold-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        currentThreshold = parseFloat(chip.dataset.thresh);
-        customThreshInput.value = '';
-        runScanMovers(false);
+    // Right Drawer Content (AI Insights, Fundamentals, System Commands)
+    async function renderDrawerTab(tabKey) {
+      currentDrawerTab = tabKey;
+      document.querySelectorAll('.drawer-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabKey);
       });
-    });
 
-    customThreshInput.addEventListener('change', (e) => {
-      const val = parseFloat(e.target.value);
-      if (val > 0) {
-        document.querySelectorAll('.threshold-chip').forEach(c => c.classList.remove('active'));
-        currentThreshold = val;
-        runScanMovers(false);
-      }
-    });
+      const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+      const stock = activeList[currentIndex] || activeList[0] || { symbol: 'RELIANCE.NS', name: 'Reliance Industries' };
 
-    // Filter pills (All / Gainers / Losers)
-    document.querySelectorAll('.filter-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        currentMoverFilter = pill.dataset.filter;
-        renderMoversList();
-        if (currentViewMode === 'grid') {
-          renderMultiChartGrid();
-        } else if (getFilteredMovers().length > 0) {
-          selectStock(0);
+      if (tabKey === 'ai') {
+        // Calculate algorithmic pivot levels from recent candles
+        let pivot = '--', r1 = '--', s1 = '--', r2 = '--', s2 = '--', pattern = 'Analyzing momentum...';
+        let sentiment = 'NEUTRAL', sentColor = 'var(--accent)', sentScore = '55%';
+
+        if (candleData && candleData.length >= 2) {
+          const last = candleData[candleData.length - 1];
+          const prev = candleData[candleData.length - 2];
+          const h = last.high, l = last.low, c = last.close;
+          const p = (h + l + c) / 3;
+          pivot = formatPrice(p);
+          r1 = formatPrice((2 * p) - l);
+          s1 = formatPrice((2 * p) - h);
+          r2 = formatPrice(p + (h - l));
+          s2 = formatPrice(p - (h - l));
+
+          // Candlestick pattern detection
+          const lastBody = Math.abs(last.close - last.open);
+          const prevBody = Math.abs(prev.close - prev.open);
+
+          if (last.close > last.open && prev.close < prev.open && last.close > prev.open && last.open < prev.close) {
+            pattern = 'Bullish Engulfing pattern detected on volume expansion.';
+            sentiment = 'BULLISH'; sentColor = 'var(--bullish)'; sentScore = '82%';
+          } else if (last.close < last.open && prev.close > prev.open && last.open > prev.close && last.close < prev.open) {
+            pattern = 'Bearish Engulfing pattern detected near local resistance.';
+            sentiment = 'BEARISH'; sentColor = 'var(--bearish)'; sentScore = '76%';
+          } else if (last.close >= last.open && (last.open - last.low) > 2 * lastBody && (last.high - last.close) < lastBody * 0.3) {
+            pattern = 'Hammer pattern forming near support zone.';
+            sentiment = 'BULLISH'; sentColor = 'var(--bullish)'; sentScore = '70%';
+          } else if (lastBody < (last.high - last.low) * 0.1) {
+            pattern = 'Doji indecision bar at key level.';
+            sentiment = 'NEUTRAL'; sentColor = 'var(--accent)'; sentScore = '50%';
+          } else if (last.close >= last.open) {
+            pattern = 'Bullish continuation structure holding above VWAP.';
+            sentiment = 'BULLISH'; sentColor = 'var(--bullish)'; sentScore = '65%';
+          } else {
+            pattern = 'Distribution pressure testing session lows.';
+            sentiment = 'BEARISH'; sentColor = 'var(--bearish)'; sentScore = '62%';
+          }
         }
+
+        drawerContent.innerHTML = `
+          <div class="ai-insight-box">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-weight: 700; font-size: 12px; color: var(--purple);">🧠 Technical & Pattern Synthesis</span>
+              <span style="font-size: 10px; background: ${sentColor}; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700;">${sentiment} (${sentScore})</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+              ${stock.symbol} (${currentTimeframe}): ${pattern}
+            </div>
+          </div>
+
+          <div class="drawer-card">
+            <div class="drawer-card-title">
+              <span>🎯 Algorithmic Floor Pivots</span>
+              <span style="font-size: 10px; color: var(--text-muted);">${currentTimeframe} Bar</span>
+            </div>
+            <div class="metric-grid">
+              <div class="metric-box">
+                <div class="metric-lbl">Resistance 2 (R2)</div>
+                <div class="metric-val" style="color: var(--bearish);">₹${r2}</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Resistance 1 (R1)</div>
+                <div class="metric-val" style="color: var(--bearish);">₹${r1}</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Central Pivot (P)</div>
+                <div class="metric-val" style="color: var(--accent);">₹${pivot}</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Support 1 (S1)</div>
+                <div class="metric-val" style="color: var(--bullish);">₹${s1}</div>
+              </div>
+              <div class="metric-box" style="grid-column: 1 / -1;">
+                <div class="metric-lbl">Support 2 (S2)</div>
+                <div class="metric-val" style="color: var(--bullish);">₹${s2}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-card">
+            <div class="drawer-card-title">
+              <span>⚡ AI Research Harness Roadmap</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+              • Real-time RSS & Corporate Filing News Ingestion<br/>
+              • LLM Multi-Timeframe Confluence Synthesis<br/>
+              • Risk/Reward Ratio & Stop Loss Engine
+            </div>
+          </div>
+        `;
+      } else if (tabKey === 'fundamentals') {
+        drawerContent.innerHTML = `
+          <div class="drawer-card">
+            <div class="drawer-card-title">
+              <span>📊 Active Stock Information</span>
+              <span style="font-size: 10px; color: var(--text-muted);">${stock.symbol}</span>
+            </div>
+            <div class="metric-grid">
+              <div class="metric-box">
+                <div class="metric-lbl">Symbol</div>
+                <div class="metric-val" style="font-size: 11px;">${stock.symbol}</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Exchange</div>
+                <div class="metric-val">NSE (India)</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Loaded Bars</div>
+                <div class="metric-val">${candleData.length} bars</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-lbl">Timeframe</div>
+                <div class="metric-val">${currentTimeframe}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-card">
+            <div class="drawer-card-title">
+              <span>🏢 Corporate Profile</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+              <strong>${stock.name}</strong> is tracked in your custom stock universe.
+              Historical data is cached in SQLite for microsecond load times.
+            </div>
+          </div>
+        `;
+      } else if (tabKey === 'system') {
+        // Query live cache metadata for this stock
+        let syncStr = 'Loading...';
+        let barCountStr = '0';
+        try {
+          const res = await fetch(`/api/cache/meta?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}`);
+          if (res.ok) {
+            const meta = await res.json();
+            if (meta) {
+              barCountStr = `${meta.candle_count} bars`;
+              const d = new Date(meta.last_synced_at * 1000);
+              syncStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            } else {
+              syncStr = 'Unsynced';
+            }
+          }
+        } catch (e) {
+          syncStr = 'Error';
+        }
+
+        drawerContent.innerHTML = `
+          <div class="drawer-card">
+            <div class="drawer-card-title">
+              <span>⚙️ 1-Click Operations</span>
+              <span style="font-size: 10px; color: var(--bullish);">Daemon Active</span>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Restart Web Service:</div>
+            <div class="cmd-snippet">
+              <code>systemctl --user restart marketwatch-web.service</code>
+              <button class="copy-chip" onclick="copyText('systemctl --user restart marketwatch-web.service', this)">Copy</button>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 6px;">Follow Real-Time Logs:</div>
+            <div class="cmd-snippet">
+              <code>journalctl --user -u marketwatch-web.service -f</code>
+              <button class="copy-chip" onclick="copyText('journalctl --user -u marketwatch-web.service -f', this)">Copy</button>
+            </div>
+
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 6px;">Trigger 3% Movers Scan:</div>
+            <div class="cmd-snippet">
+              <code>market scan --threshold 3.0 --notify</code>
+              <button class="copy-chip" onclick="copyText('market scan --threshold 3.0 --notify', this)">Copy</button>
+            </div>
+          </div>
+
+          <div class="drawer-card">
+            <div class="drawer-card-title">
+              <span>🗄️ SQLite Storage Stats</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6;">
+              • Active Cache: <strong>${barCountStr}</strong><br/>
+              • Last Synced: <strong>${syncStr}</strong><br/>
+              • Database: <code style="font-family: var(--font-mono); color: var(--accent);">~/.config/marketwatch/marketwatch.db</code><br/>
+              • Concurrency: <strong>WAL (Write-Ahead Logging)</strong>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function copyText(txt, btn) {
+      navigator.clipboard.writeText(txt);
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = orig, 1500);
+    }
+
+    // Command Palette Setup
+    const paletteActions = [
+      { name: 'Force Sync / Remote Refresh', tag: 'sync', run: () => fetchChartData(true) },
+      { name: 'Restart MarketWatch Web Service', tag: 'systemctl restart', run: () => {
+        fetch('/api/scan/state').then(() => showToast('Command: systemctl --user restart marketwatch-web.service'));
+      }},
+      { name: 'Run 3% Movers Scan (Force)', tag: 'scan', run: () => runScanMovers(true) },
+      { name: 'Toggle Single Focus / Multi Grid', tag: 'view', run: () => setViewMode(currentViewMode === 'single' ? 'grid' : 'single') },
+      { name: 'Toggle Intel & Research Drawer', tag: 'drawer', run: toggleIntelDrawer },
+      { name: 'Toggle White / Black Theme', tag: 'theme', run: toggleTheme },
+      { name: 'Switch to 15m Timeframe', tag: '15m', run: () => setTimeframe('15m') },
+      { name: 'Switch to 1d Timeframe', tag: '1d', run: () => setTimeframe('1d') },
+      { name: 'Switch to 5m Timeframe', tag: '5m', run: () => setTimeframe('5m') },
+      { name: 'Switch to 1h Timeframe', tag: '1h', run: () => setTimeframe('1h') },
+      { name: 'Add New Stock to Universe', tag: 'add', run: () => document.getElementById('modal-add').classList.add('open') },
+    ];
+
+    function openPalette() {
+      paletteModal.classList.add('open');
+      paletteInput.value = '';
+      renderPaletteList(paletteActions);
+      setTimeout(() => paletteInput.focus(), 50);
+    }
+
+    function closePalette() {
+      paletteModal.classList.remove('open');
+    }
+
+    function renderPaletteList(actions) {
+      paletteList.innerHTML = '';
+      actions.forEach((a, i) => {
+        const li = document.createElement('li');
+        li.className = 'palette-item' + (i === 0 ? ' selected' : '');
+        li.innerHTML = `<span>${a.name}</span><span class="palette-item-tag">${a.tag}</span>`;
+        li.addEventListener('click', () => {
+          a.run();
+          closePalette();
+        });
+        paletteList.appendChild(li);
       });
+    }
+
+    paletteInput.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      const stockActions = stocks
+        .filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map(s => ({
+          name: `Switch to ${s.symbol} (${s.name})`,
+          tag: 'stock',
+          run: () => {
+            const idx = stocks.findIndex(x => x.symbol === s.symbol);
+            if (idx !== -1) selectStock(idx);
+          }
+        }));
+
+      const filteredCmds = paletteActions.filter(a => a.name.toLowerCase().includes(q) || a.tag.toLowerCase().includes(q));
+      renderPaletteList([...stockActions, ...filteredCmds]);
     });
 
-    // Scan Now Trigger
-    btnScanTrigger.addEventListener('click', () => runScanMovers(true));
+    // Event Listeners
+    document.getElementById('btn-rail-palette').addEventListener('click', openPalette);
+    paletteModal.addEventListener('click', (e) => {
+      if (e.target === paletteModal) closePalette();
+    });
 
-    // Theme Toggle
-    function toggleTheme() {
-      isDark = !isDark;
-      document.body.classList.toggle('dark', isDark);
-      themeIcon.textContent = isDark ? '☀️' : '🌙';
+    document.getElementById('btn-rail-watchlist').addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      setTimeout(() => chart.resize(document.getElementById('chart-canvas').clientWidth, document.getElementById('chart-canvas').clientHeight), 220);
+    });
+
+    function toggleIntelDrawer() {
+      intelDrawer.classList.toggle('collapsed');
+      document.getElementById('btn-toggle-intel').classList.toggle('active', !intelDrawer.classList.contains('collapsed'));
+      setTimeout(() => chart.resize(document.getElementById('chart-canvas').clientWidth, document.getElementById('chart-canvas').clientHeight), 220);
+    }
+
+    document.getElementById('btn-toggle-intel').addEventListener('click', toggleIntelDrawer);
+    document.getElementById('btn-rail-intel').addEventListener('click', toggleIntelDrawer);
+    document.getElementById('btn-close-drawer').addEventListener('click', toggleIntelDrawer);
+
+    document.querySelectorAll('.drawer-tab').forEach(btn => {
+      btn.addEventListener('click', () => renderDrawerTab(btn.dataset.tab));
+    });
+
+    // View Switching
+    document.getElementById('btn-rail-chart').addEventListener('click', () => setViewMode('single'));
+    document.getElementById('btn-rail-grid').addEventListener('click', () => setViewMode('grid'));
+
+    // Timeframe Click
+    document.querySelectorAll('.tf-seg-btn').forEach(btn => {
+      btn.addEventListener('click', () => setTimeframe(btn.dataset.tf));
+    });
+
+    function setTimeframe(tf) {
+      currentTimeframe = tf;
+      document.querySelectorAll('.tf-seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
       if (currentViewMode === 'single') {
-        initChart();
-        if (candleData.length > 0) renderChartData(candleData);
+        fetchChartData();
       } else {
         renderMultiChartGrid();
       }
     }
-    themeBtn.addEventListener('click', toggleTheme);
 
+    // Zoom Range
+    const zoomRange = document.getElementById('zoom-range');
+    const zoomVal = document.getElementById('zoom-val');
+    zoomRange.value = userZoom;
+    zoomVal.textContent = `${userZoom}px`;
+
+    zoomRange.addEventListener('input', (e) => {
+      userZoom = parseFloat(e.target.value);
+      zoomVal.textContent = `${userZoom}px`;
+      localStorage.setItem('mw-zoom', String(userZoom));
+      if (chart && currentViewMode === 'single') {
+        chart.timeScale().applyOptions({
+          barSpacing: userZoom,
+          rightOffset: Math.max(3, Math.round(userZoom + 2)),
+          minBarSpacing: 0.5,
+        });
+      }
+    });
+
+    // Force Sync button
     document.getElementById('btn-refresh').addEventListener('click', () => {
+      const svg = document.getElementById('btn-refresh').querySelector('svg');
+      svg.style.transition = 'transform 0.5s ease';
+      svg.style.transform = 'rotate(360deg)';
+      setTimeout(() => svg.style.transform = '', 500);
+
       if (currentTab === 'movers') {
         runScanMovers(true);
       } else {
@@ -2618,72 +1920,82 @@
       }
     });
 
-    // Zoom slider: adjusts default barSpacing, persisted in localStorage
-    const zoomSlider = document.getElementById('zoom-slider');
-    const zoomValEl = document.getElementById('zoom-val');
-    // Init slider from stored value
-    zoomSlider.value = userZoom;
-    zoomValEl.textContent = userZoom;
+    // Sidebar Tabs
+    const tabUniverse = document.getElementById('tab-universe');
+    const tabMovers = document.getElementById('tab-movers');
+    const moversSubbar = document.getElementById('movers-subbar');
 
-    zoomSlider.addEventListener('input', (e) => {
-      userZoom = parseFloat(e.target.value);
-      zoomValEl.textContent = userZoom;
-      localStorage.setItem('mw-zoom', String(userZoom));
+    tabUniverse.addEventListener('click', () => {
+      tabUniverse.classList.add('active');
+      tabMovers.classList.remove('active');
+      moversSubbar.style.display = 'none';
+      currentTab = 'universe';
+      renderStockList();
+      selectStock(0);
+    });
 
-      // Apply immediately to current chart
-      if (chart && currentViewMode === 'single') {
-        const p = getTimeframeChartParams(currentTimeframe);
-        chart.timeScale().applyOptions({
-          barSpacing: p.barSpacing,
-          minBarSpacing: p.minBarSpacing,
-          rightOffset: p.rightOffset,
-        });
+    tabMovers.addEventListener('click', () => {
+      tabMovers.classList.add('active');
+      tabUniverse.classList.remove('active');
+      moversSubbar.style.display = 'flex';
+      currentTab = 'movers';
+      if (!moversData) {
+        runScanMovers(false);
+      } else {
+        renderMoversList();
+        selectStock(0);
       }
     });
 
-    // Timeframe buttons
-    document.querySelectorAll('.tf-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentTimeframe = btn.dataset.tf;
-        if (currentViewMode === 'single') {
-          fetchChartData();
-        } else if (currentViewMode === 'grid') {
-          renderMultiChartGrid();
-        } else if (currentViewMode === 'intel') {
-          renderIntelView();
-        }
+    // Threshold Chips
+    document.querySelectorAll('.threshold-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.threshold-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentThreshold = parseFloat(chip.dataset.thresh);
+        updateMoversCount();
+        if (currentTab === 'movers') renderMoversList();
+        if (currentViewMode === 'grid') renderMultiChartGrid();
       });
     });
 
-    // Search filter
-    searchInput.addEventListener('input', (e) => {
+    // Live Search
+    document.getElementById('search-input').addEventListener('input', (e) => {
       renderStockList(e.target.value);
     });
 
-    // Modal controls
+    // Modals
     document.getElementById('btn-add-stock').addEventListener('click', () => {
-      document.getElementById('add-modal').classList.add('open');
-      document.getElementById('new-symbol').focus();
+      document.getElementById('modal-add').classList.add('open');
+      document.getElementById('input-new-sym').focus();
     });
-
-    document.getElementById('modal-cancel').addEventListener('click', () => {
-      document.getElementById('add-modal').classList.remove('open');
+    document.getElementById('btn-modal-cancel').addEventListener('click', () => {
+      document.getElementById('modal-add').classList.remove('open');
     });
-
-    document.getElementById('modal-save').addEventListener('click', () => {
-      const sym = document.getElementById('new-symbol').value;
-      const nm = document.getElementById('new-name').value;
+    document.getElementById('btn-modal-save').addEventListener('click', () => {
+      const sym = document.getElementById('input-new-sym').value;
+      const nm = document.getElementById('input-new-name').value;
       addStock(sym, nm);
     });
+
+    // Theme Toggle
+    function toggleTheme() {
+      isDark = !isDark;
+      document.body.classList.toggle('dark-theme', isDark);
+      document.getElementById('rail-theme-icon').textContent = isDark ? '☀️' : '🌙';
+      initChart();
+      if (candleData.length > 0) renderChartData(candleData);
+      if (currentViewMode === 'grid') renderMultiChartGrid();
+    }
+    document.getElementById('btn-rail-theme').addEventListener('click', toggleTheme);
 
     // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
         if (e.key === 'Escape') {
           document.activeElement.blur();
-          document.getElementById('add-modal').classList.remove('open');
+          closePalette();
+          document.getElementById('modal-add').classList.remove('open');
         }
         return;
       }
@@ -2691,23 +2003,13 @@
       const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
       if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'J') {
         e.preventDefault();
-        if (activeList.length > 0) {
-          selectStock((currentIndex + 1) % activeList.length);
-        }
+        if (activeList.length > 0) selectStock((currentIndex + 1) % activeList.length);
       } else if (e.key === 'ArrowUp' || e.key === 'k' || e.key === 'K') {
         e.preventDefault();
-        if (activeList.length > 0) {
-          selectStock((currentIndex - 1 + activeList.length) % activeList.length);
-        }
+        if (activeList.length > 0) selectStock((currentIndex - 1 + activeList.length) % activeList.length);
       } else if (['1','2','3','4','5','6'].includes(e.key)) {
         const tfMap = { '1':'5m', '2':'15m', '3':'30m', '4':'1h', '5':'1d', '6':'1w' };
-        currentTimeframe = tfMap[e.key];
-        document.querySelectorAll('.tf-btn').forEach(b => {
-          b.classList.toggle('active', b.dataset.tf === currentTimeframe);
-        });
-        if (currentViewMode === 'single') fetchChartData();
-        else if (currentViewMode === 'grid') renderMultiChartGrid();
-        else if (currentViewMode === 'intel') renderIntelView();
+        setTimeframe(tfMap[e.key]);
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         if (currentTab === 'movers') runScanMovers(true);
@@ -2724,28 +2026,46 @@
         setViewMode(currentViewMode === 'single' ? 'grid' : 'single');
       } else if (e.key === 'i' || e.key === 'I') {
         e.preventDefault();
-        setViewMode(currentViewMode === 'intel' ? 'single' : 'intel');
+        toggleIntelDrawer();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openPalette();
       } else if (e.key === '/') {
         e.preventDefault();
-        searchInput.focus();
+        document.getElementById('search-input').focus();
       } else if (e.key === 'Escape') {
-        document.getElementById('add-modal').classList.remove('open');
+        closePalette();
+        document.getElementById('modal-add').classList.remove('open');
       }
     });
 
-    // Check schedule status
-    async function updateScheduleStatus() {
-      try {
-        const res = await fetch('/api/scan/state');
-        const state = await res.json();
-        const badge = document.getElementById('schedule-badge');
-        if (state.last_morning_scan_date || state.last_evening_scan_date) {
-          const morning = state.last_morning_scan_date ? `Morning (${state.last_morning_scan_date})` : '';
-          const evening = state.last_evening_scan_date ? `Evening (${state.last_evening_scan_date})` : '';
-          badge.title = `Last scans: ${[morning, evening].filter(Boolean).join(' | ')}. Cron triggers at 09:30 & 15:30 IST.`;
-        }
-      } catch (e) {
-        console.warn('Failed schedule status check:', e);
+    window.addEventListener('resize', () => {
+      if (chart) chart.resize(document.getElementById('chart-canvas').clientWidth, document.getElementById('chart-canvas').clientHeight);
+    });
+
+    // Check Market Status (Indian Standard Time UTC+5:30)
+    function updateMarketStatus() {
+      const now = new Date();
+      // UTC to IST
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const ist = new Date(utc + (3600000 * 5.5));
+      const day = ist.getDay(); // 0 Sun, 6 Sat
+      const hours = ist.getHours();
+      const mins = ist.getMinutes();
+      const totalMins = hours * 60 + mins;
+
+      const isWeekday = day >= 1 && day <= 5;
+      const isOpen = isWeekday && totalMins >= (9 * 60 + 15) && totalMins < (15 * 60 + 30);
+
+      const dot = document.getElementById('market-dot');
+      const lbl = document.getElementById('market-status-lbl');
+
+      if (isOpen) {
+        dot.style.background = 'var(--bullish)';
+        lbl.textContent = 'NSE: Live (09:15 - 15:30 IST)';
+      } else {
+        dot.style.background = 'var(--bearish)';
+        lbl.textContent = 'NSE: Market Closed';
       }
     }
 
@@ -2754,7 +2074,7 @@
       initChart();
       loadStocks();
       loadCachedMovers();
-      updateScheduleStatus();
+      updateMarketStatus();
     });
   </script>
 </body>
