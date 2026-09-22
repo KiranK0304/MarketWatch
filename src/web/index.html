@@ -297,6 +297,39 @@
       font-size: 16px;
     }
 
+    /* Zoom Control */
+    .zoom-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-subtle);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+    }
+
+    .zoom-control label {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .zoom-control input[type="range"] {
+      width: 80px;
+      height: 4px;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    .zoom-control .zoom-val {
+      min-width: 18px;
+      text-align: center;
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+
     /* Main Workspace Layout */
     .workspace {
       display: flex;
@@ -1103,13 +1136,19 @@
         <span>🔔 09:30 & 15:30 Catch-up Active</span>
       </div>
 
-      <!-- Fetch Latest Button -->
       <button class="action-btn" id="btn-refresh" title="Fetch latest data (R)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
         </svg>
         <span>Refresh</span>
       </button>
+
+      <!-- Zoom Control Slider -->
+      <div class="zoom-control" title="Default chart zoom level (persisted)">
+        <label>🔍</label>
+        <input type="range" id="zoom-slider" min="1" max="10" step="0.5" value="2" />
+        <span class="zoom-val" id="zoom-val">2</span>
+      </div>
 
       <!-- Theme Toggle Button (White default, Black toggle) -->
       <button class="action-btn theme-toggle-btn" id="btn-theme" title="Toggle White / Black Theme (T)">
@@ -1291,21 +1330,17 @@
     let volumeSeries = null;
     let candleData = [];
 
-    // Returns timeframe-adaptive chart spacing parameters.
-    // Professional brokers use different zoom levels per timeframe:
-    // - Daily candles are wide and easy to read (fewer bars)
-    // - 15m candles are moderately spaced (moderate bar count)
-    // - Sub-15m candles are tighter (many bars)
+    // User-configurable default zoom level (barSpacing).
+    // Loaded from localStorage, adjustable via the 🔍 slider in the header.
+    // Range: 1 (maximum zoom-out) to 10 (maximum zoom-in). Default: 2.
+    let userZoom = parseFloat(localStorage.getItem('mw-zoom') || '2');
+
+    // Returns chart spacing driven by the user's zoom slider.
+    // The slider value directly controls barSpacing; rightOffset scales with it.
     function getTimeframeChartParams(tf) {
-      switch (tf) {
-        case '1d':  return { barSpacing: 3, minBarSpacing: 1, rightOffset: 5 };
-        case '1w':  return { barSpacing: 4, minBarSpacing: 1, rightOffset: 5 };
-        case '1h':  return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
-        case '15m': return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
-        case '30m': return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
-        case '5m':  return { barSpacing: 2.5, minBarSpacing: 1, rightOffset: 4 };
-        default:    return { barSpacing: 3, minBarSpacing: 1, rightOffset: 4 };
-      }
+      const bs = userZoom;
+      const ro = Math.max(3, Math.round(userZoom + 2));
+      return { barSpacing: bs, minBarSpacing: 0.5, rightOffset: ro };
     }
 
     // Elements
@@ -1510,7 +1545,7 @@
     }
 
     // Fetch and Load Single Chart Data
-    async function fetchChartData() {
+    async function fetchChartData(force = false) {
       const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
       if (activeList.length === 0) return;
       const stock = activeList[currentIndex] || activeList[0];
@@ -1519,11 +1554,12 @@
       document.getElementById('hdr-symbol').textContent = stock.symbol;
       document.getElementById('hdr-name').textContent = stock.name;
 
-      loadingMsg.textContent = `Fetching ${currentTimeframe} data for ${stock.symbol}...`;
+      loadingMsg.textContent = `Loading ${currentTimeframe} data for ${stock.symbol}...`;
       loadingOverlay.classList.add('visible');
 
       try {
-        const res = await fetch(`/api/candles?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}`);
+        const url = `/api/candles?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}${force ? '&force=true' : ''}`;
+        const res = await fetch(url);
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.error || 'Failed to fetch');
@@ -2099,7 +2135,30 @@
       if (currentTab === 'movers') {
         runScanMovers(true);
       } else {
-        fetchChartData();
+        fetchChartData(true);
+      }
+    });
+
+    // Zoom slider: adjusts default barSpacing, persisted in localStorage
+    const zoomSlider = document.getElementById('zoom-slider');
+    const zoomValEl = document.getElementById('zoom-val');
+    // Init slider from stored value
+    zoomSlider.value = userZoom;
+    zoomValEl.textContent = userZoom;
+
+    zoomSlider.addEventListener('input', (e) => {
+      userZoom = parseFloat(e.target.value);
+      zoomValEl.textContent = userZoom;
+      localStorage.setItem('mw-zoom', String(userZoom));
+
+      // Apply immediately to current chart
+      if (chart && currentViewMode === 'single') {
+        const p = getTimeframeChartParams(currentTimeframe);
+        chart.timeScale().applyOptions({
+          barSpacing: p.barSpacing,
+          minBarSpacing: p.minBarSpacing,
+          rightOffset: p.rightOffset,
+        });
       }
     });
 
@@ -2170,7 +2229,7 @@
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         if (currentTab === 'movers') runScanMovers(true);
-        else fetchChartData();
+        else fetchChartData(true);
       } else if (e.key === 't' || e.key === 'T') {
         e.preventDefault();
         toggleTheme();
