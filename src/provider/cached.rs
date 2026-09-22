@@ -43,12 +43,10 @@ impl<P: MarketDataProvider> CachedProvider<P> {
         let tf_label = timeframe.label();
 
         // If not forcing refresh, check if DB cache is already fresh
-        if !force {
-            if self.db.is_fresh(symbol, tf_label, self.ttl_secs)? {
-                let cached = self.db.get_candles(symbol, tf_label)?;
-                if !cached.is_empty() {
-                    return Ok((cached, true));
-                }
+        if !force && self.db.is_fresh(symbol, tf_label, self.ttl_secs)? {
+            let cached = self.db.get_candles(symbol, tf_label)?;
+            if !cached.is_empty() {
+                return Ok((cached, true));
             }
         }
 

@@ -367,38 +367,37 @@ async fn scan_movers(
     let mut scan_state = ScanState::load(&state_path);
 
     let now = chrono::Utc::now().timestamp();
-    if !force {
-        if let Some(ref last) = scan_state.last_scan_result {
-            // If scan is less than 3 minutes old, filter locally
-            if (now - last.timestamp).abs() < 180 {
-                let mut movers: Vec<StockMover> = last
-                    .all_quotes
-                    .iter()
-                    .filter(|m| m.matches_threshold(threshold))
-                    .cloned()
-                    .collect();
+    if !force
+        && let Some(ref last) = scan_state.last_scan_result
+        // If scan is less than 3 minutes old, filter locally
+        && (now - last.timestamp).abs() < 180
+    {
+        let mut movers: Vec<StockMover> = last
+            .all_quotes
+            .iter()
+            .filter(|m| m.matches_threshold(threshold))
+            .cloned()
+            .collect();
 
-                movers.sort_by(|a, b| {
-                    b.change_percent
-                        .abs()
-                        .partial_cmp(&a.change_percent.abs())
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
+        movers.sort_by(|a, b| {
+            b.change_percent
+                .abs()
+                .partial_cmp(&a.change_percent.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
-                let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
-                let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
-                let movers_count = movers.len();
+        let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
+        let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
+        let movers_count = movers.len();
 
-                let mut updated = last.clone();
-                updated.threshold_percent = threshold;
-                updated.movers_count = movers_count;
-                updated.gainers_count = gainers_count;
-                updated.losers_count = losers_count;
-                updated.movers = movers;
+        let mut updated = last.clone();
+        updated.threshold_percent = threshold;
+        updated.movers_count = movers_count;
+        updated.gainers_count = gainers_count;
+        updated.losers_count = losers_count;
+        updated.movers = movers;
 
-                return Ok(Json(updated));
-            }
-        }
+        return Ok(Json(updated));
     }
 
     let config = config::load_stock_config(&state.config_path).map_err(|e| {

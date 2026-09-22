@@ -202,9 +202,9 @@ pub fn show_popup_dialog(result: &ScanResult, slot_label: Option<&str>) {
         "--width=480",
     ]);
 
-    if let Ok(status) = cmd.status() {
-        if status.success() {
-            open_dashboard(3000);
-        }
+    if let Ok(status) = cmd.status()
+        && status.success()
+    {
+        open_dashboard(3000);
     }
 }

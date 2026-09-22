@@ -293,7 +293,7 @@ impl MarketDb {
         const CLOSE_MINUTES: u32 = 15 * 60 + 30; // 03:30 PM IST
 
         let is_market_open =
-            is_trading_day && current_minutes >= OPEN_MINUTES && current_minutes < CLOSE_MINUTES;
+            is_trading_day && (OPEN_MINUTES..CLOSE_MINUTES).contains(&current_minutes);
 
         if is_market_open {
             // During market hours, check TTL window
