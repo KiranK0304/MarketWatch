@@ -150,7 +150,7 @@
 
     /* 2. Collapsible Watchlist / Screener Sidebar */
     .sidebar {
-      width: 280px;
+      width: 300px;
       background: var(--bg-surface);
       border-right: 1px solid var(--border);
       display: flex;
@@ -235,30 +235,150 @@
       pointer-events: none;
     }
 
-    .movers-subbar {
+    /* Movers Toolbar */
+    .movers-toolbar {
       display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .threshold-row {
+      display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 6px;
-      padding-top: 4px;
+      gap: 4px;
+    }
+
+    .threshold-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .threshold-chips {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .threshold-chip {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       font-family: var(--font-mono);
       background: var(--bg-subtle);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 2px 6px;
+      padding: 3px 6px;
       cursor: pointer;
       color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    .threshold-chip:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
     }
 
     .threshold-chip.active {
       background: var(--accent);
       color: white;
       border-color: var(--accent);
+    }
+
+    .custom-threshold-input {
+      width: 42px;
+      padding: 3px 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      text-align: center;
+      outline: none;
+    }
+
+    .custom-threshold-input:focus {
+      border-color: var(--accent);
+      background: var(--bg-surface);
+    }
+
+    .filter-type-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .filter-pills {
+      display: flex;
+      background: var(--bg-subtle);
+      padding: 2px;
+      border-radius: 6px;
+      gap: 2px;
+    }
+
+    .filter-pill {
+      border: none;
+      background: transparent;
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.12s ease;
+    }
+
+    .filter-pill:hover {
+      color: var(--text-primary);
+    }
+
+    .filter-pill.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .filter-pill.active[data-filter="gainers"] {
+      color: var(--bullish);
+      font-weight: 700;
+    }
+
+    .filter-pill.active[data-filter="losers"] {
+      color: var(--bearish);
+      font-weight: 700;
+    }
+
+    .btn-scan-trigger {
+      background: var(--accent-subtle);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .btn-scan-trigger:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-scan-trigger.scanning {
+      opacity: 0.6;
+      pointer-events: none;
     }
 
     .stock-list {
@@ -926,19 +1046,37 @@
         <button class="sidebar-tab-btn" id="tab-movers">Movers (<span id="count-movers">0</span>)</button>
       </div>
 
-      <div class="search-input-wrapper">
+      <div class="search-input-wrapper" id="search-wrapper">
         <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input type="text" class="search-input" id="search-input" placeholder="Search NSE stocks (/)...">
       </div>
 
-      <!-- Movers Threshold Filters -->
-      <div class="movers-subbar" id="movers-subbar">
-        <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Threshold:</span>
-        <div style="display: flex; gap: 4px;">
-          <button class="threshold-chip" data-thresh="1.0">±1%</button>
-          <button class="threshold-chip" data-thresh="2.0">±2%</button>
-          <button class="threshold-chip active" data-thresh="3.0">±3%</button>
-          <button class="threshold-chip" data-thresh="5.0">±5%</button>
+      <!-- Movers Toolbar (Active when tab-movers is clicked) -->
+      <div class="movers-toolbar" id="movers-toolbar">
+        <div class="threshold-row">
+          <span class="threshold-label">Threshold:</span>
+          <div class="threshold-chips">
+            <button class="threshold-chip" data-thresh="1.0">1%</button>
+            <button class="threshold-chip" data-thresh="2.0">2%</button>
+            <button class="threshold-chip active" data-thresh="3.0">3%</button>
+            <button class="threshold-chip" data-thresh="5.0">5%</button>
+            <input type="number" class="custom-threshold-input" id="custom-thresh" placeholder="%" min="0.1" max="50" step="0.5" title="Custom threshold %">
+          </div>
+        </div>
+
+        <div class="filter-type-row">
+          <div class="filter-pills">
+            <button class="filter-pill active" data-filter="all" title="Show all movers exceeding threshold">All</button>
+            <button class="filter-pill" data-filter="gainers" title="Show only upward moves (Rise / Gainers)">🚀 Rise</button>
+            <button class="filter-pill" data-filter="losers" title="Show only downward moves (Fall / Losers)">🔻 Fall</button>
+          </div>
+
+          <button class="btn-scan-trigger" id="btn-scan-trigger" title="Trigger fresh 150-stock scan">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span>Scan</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1085,6 +1223,8 @@
     let currentViewMode = 'single'; // 'single' | 'grid'
     let currentTab = 'universe'; // 'universe' | 'movers'
     let currentThreshold = 3.0;
+    let currentMoverFilter = 'all'; // 'all' | 'gainers' | 'losers'
+    let isScanning = false;
     let moversData = null;
     let candleData = [];
     let currentDrawerTab = 'ai';
@@ -1409,12 +1549,18 @@
     // Movers Screener
     function getFilteredMovers() {
       if (!moversData || !moversData.movers) return [];
-      return moversData.movers.filter(m => Math.abs(m.change_percent) >= currentThreshold);
+      let list = moversData.movers.filter(m => Math.abs(m.change_percent) >= currentThreshold);
+      if (currentMoverFilter === 'gainers') {
+        list = list.filter(m => m.change_percent >= 0);
+      } else if (currentMoverFilter === 'losers') {
+        list = list.filter(m => m.change_percent < 0);
+      }
+      return list;
     }
 
     async function loadCachedMovers() {
       try {
-        const res = await fetch('/api/scan/cached');
+        const res = await fetch(`/api/scan/cached?threshold=${currentThreshold}`);
         const data = await res.json();
         if (data) {
           moversData = data;
@@ -1427,17 +1573,33 @@
     }
 
     async function runScanMovers(force = true) {
-      showToast('Scanning 150+ stocks for movers...');
+      if (isScanning) return;
+      isScanning = true;
+      const scanBtn = document.getElementById('btn-scan-trigger');
+      if (scanBtn) {
+        scanBtn.classList.add('scanning');
+        scanBtn.querySelector('span').textContent = 'Scanning...';
+      }
+      showToast(`Scanning 150+ stocks for ±${currentThreshold}% movers...`);
       try {
         const res = await fetch(`/api/scan?threshold=${currentThreshold}&force=${force}`);
         if (!res.ok) throw new Error('Scan failed');
         moversData = await res.json();
         updateMoversCount();
-        if (currentTab === 'movers') renderMoversList();
+        if (currentTab === 'movers') {
+          renderMoversList();
+          if (getFilteredMovers().length > 0) selectStock(0);
+        }
         if (currentViewMode === 'grid') renderMultiChartGrid();
-        showToast(`Scan complete: ${moversData.movers_count} movers`);
+        showToast(`Scan complete: ${moversData.movers_count} movers (±${currentThreshold}%)`);
       } catch (e) {
         showToast('Scan error: ' + e.message);
+      } finally {
+        isScanning = false;
+        if (scanBtn) {
+          scanBtn.classList.remove('scanning');
+          scanBtn.querySelector('span').textContent = 'Scan';
+        }
       }
     }
 
@@ -1450,10 +1612,16 @@
       stockListEl.innerHTML = '';
       const list = getFilteredMovers();
       if (list.length === 0) {
+        const dirLabel = currentMoverFilter === 'gainers' ? 'gainers (rise)' : currentMoverFilter === 'losers' ? 'losers (fall)' : 'movers';
         stockListEl.innerHTML = `
           <div style="padding: 24px 14px; text-align: center; color: var(--text-muted); font-size: 12px;">
-            No movers beyond ±${currentThreshold}% found.<br/><br/>
-            <button class="add-btn" onclick="runScanMovers(true)">Refresh Scan</button>
+            No ${dirLabel} beyond ±${currentThreshold}% found.<br/><br/>
+            <button class="btn-scan-trigger" style="margin: 0 auto;" onclick="runScanMovers(true)">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span>Refresh Scan</span>
+            </button>
           </div>
         `;
         return;
@@ -1796,7 +1964,9 @@
       { name: 'Switch to 15m Timeframe', tag: '15m', run: () => setTimeframe('15m') },
       { name: 'Switch to 1d Timeframe', tag: '1d', run: () => setTimeframe('1d') },
       { name: 'Switch to 5m Timeframe', tag: '5m', run: () => setTimeframe('5m') },
-      { name: 'Switch to 1h Timeframe', tag: '1h', run: () => setTimeframe('1h') },
+      { name: 'Movers: Filter Upward Moves (🚀 Rise / Gainers)', tag: 'rise gainers up', run: () => { tabMovers.click(); const btn = document.querySelector('.filter-pill[data-filter="gainers"]'); if (btn) btn.click(); } },
+      { name: 'Movers: Filter Downward Moves (🔻 Fall / Losers)', tag: 'fall losers down', run: () => { tabMovers.click(); const btn = document.querySelector('.filter-pill[data-filter="losers"]'); if (btn) btn.click(); } },
+      { name: 'Movers: Show All Movers (Rise & Fall)', tag: 'movers all', run: () => { tabMovers.click(); const btn = document.querySelector('.filter-pill[data-filter="all"]'); if (btn) btn.click(); } },
       { name: 'Add New Stock to Universe', tag: 'add', run: () => document.getElementById('modal-add').classList.add('open') },
     ];
 
@@ -1920,15 +2090,19 @@
       }
     });
 
-    // Sidebar Tabs
+    // Sidebar Tabs: Universe vs Movers
     const tabUniverse = document.getElementById('tab-universe');
     const tabMovers = document.getElementById('tab-movers');
-    const moversSubbar = document.getElementById('movers-subbar');
+    const searchWrapper = document.getElementById('search-wrapper');
+    const moversToolbar = document.getElementById('movers-toolbar');
+    const sidebarFooter = document.querySelector('.sidebar-footer');
 
     tabUniverse.addEventListener('click', () => {
       tabUniverse.classList.add('active');
       tabMovers.classList.remove('active');
-      moversSubbar.style.display = 'none';
+      if (searchWrapper) searchWrapper.style.display = 'flex';
+      if (moversToolbar) moversToolbar.style.display = 'none';
+      if (sidebarFooter) sidebarFooter.style.display = 'block';
       currentTab = 'universe';
       renderStockList();
       selectStock(0);
@@ -1937,27 +2111,75 @@
     tabMovers.addEventListener('click', () => {
       tabMovers.classList.add('active');
       tabUniverse.classList.remove('active');
-      moversSubbar.style.display = 'flex';
+      if (searchWrapper) searchWrapper.style.display = 'none';
+      if (moversToolbar) moversToolbar.style.display = 'flex';
+      if (sidebarFooter) sidebarFooter.style.display = 'none';
       currentTab = 'movers';
       if (!moversData) {
         runScanMovers(false);
       } else {
+        updateMoversCount();
         renderMoversList();
-        selectStock(0);
+        if (currentViewMode === 'grid') {
+          renderMultiChartGrid();
+        } else if (getFilteredMovers().length > 0) {
+          selectStock(0);
+        }
       }
     });
 
-    // Threshold Chips
+    // Threshold Preset Chips
     document.querySelectorAll('.threshold-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         document.querySelectorAll('.threshold-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         currentThreshold = parseFloat(chip.dataset.thresh);
+        const customInp = document.getElementById('custom-thresh');
+        if (customInp) customInp.value = '';
         updateMoversCount();
         if (currentTab === 'movers') renderMoversList();
         if (currentViewMode === 'grid') renderMultiChartGrid();
+        else if (getFilteredMovers().length > 0) selectStock(0);
       });
     });
+
+    // Custom Threshold Input
+    const customThreshInput = document.getElementById('custom-thresh');
+    if (customThreshInput) {
+      customThreshInput.addEventListener('change', (e) => {
+        const val = parseFloat(e.target.value);
+        if (val > 0) {
+          document.querySelectorAll('.threshold-chip').forEach(c => c.classList.remove('active'));
+          currentThreshold = val;
+          updateMoversCount();
+          if (currentTab === 'movers') renderMoversList();
+          if (currentViewMode === 'grid') renderMultiChartGrid();
+          else if (getFilteredMovers().length > 0) selectStock(0);
+        }
+      });
+    }
+
+    // Direction Filter Pills (All / 🚀 Rise / 🔻 Fall)
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentMoverFilter = pill.dataset.filter;
+        updateMoversCount();
+        if (currentTab === 'movers') renderMoversList();
+        if (currentViewMode === 'grid') {
+          renderMultiChartGrid();
+        } else if (getFilteredMovers().length > 0) {
+          selectStock(0);
+        }
+      });
+    });
+
+    // Scan Now Trigger
+    const btnScanTrigger = document.getElementById('btn-scan-trigger');
+    if (btnScanTrigger) {
+      btnScanTrigger.addEventListener('click', () => runScanMovers(true));
+    }
 
     // Live Search
     document.getElementById('search-input').addEventListener('input', (e) => {
