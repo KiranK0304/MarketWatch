@@ -33,3 +33,6 @@ thiserror = "2"
 anyhow = "1"
 axum = "0.8.9"
 webbrowser = "1.2.4"
+
+# Storage
+rusqlite = { version = "0.32", features = ["bundled"] }

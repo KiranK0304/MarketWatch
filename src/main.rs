@@ -9,6 +9,7 @@ mod domain;
 mod error;
 mod provider;
 mod scanner;
+mod storage;
 mod ui;
 mod web;
 

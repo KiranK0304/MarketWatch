@@ -26,6 +26,8 @@ pub enum MarketError {
     InvalidSymbol(String),
     /// Configuration file error.
     Config(String),
+    /// Database/storage error.
+    Database(String),
     /// Invalid timeframe string.
     InvalidTimeframe(String),
 }
@@ -50,6 +52,7 @@ impl fmt::Display for MarketError {
             }
             MarketError::InvalidSymbol(s) => write!(f, "Invalid symbol: '{s}'"),
             MarketError::Config(msg) => write!(f, "Configuration error: {msg}"),
+            MarketError::Database(msg) => write!(f, "Database error: {msg}"),
             MarketError::InvalidTimeframe(s) => write!(f, "Invalid timeframe: '{s}'"),
         }
     }
@@ -69,3 +72,10 @@ impl From<reqwest::Error> for MarketError {
         MarketError::Network(e)
     }
 }
+
+impl From<rusqlite::Error> for MarketError {
+    fn from(e: rusqlite::Error) -> Self {
+        MarketError::Database(e.to_string())
+    }
+}
+
