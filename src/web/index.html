@@ -963,6 +963,31 @@
     }
     .modal-input:focus { border-color: var(--accent); }
 
+    .shortcut-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+    .shortcut-row:last-child {
+      border-bottom: none;
+    }
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: var(--text-primary);
+      box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+      display: inline-block;
+    }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -1030,6 +1055,13 @@
     <button class="rail-btn" id="btn-rail-palette" title="Command Palette (Ctrl+K)">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path>
+      </svg>
+    </button>
+
+    <button class="rail-btn" id="btn-rail-shortcuts" title="Keyboard Shortcuts (?)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+        <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"></path>
       </svg>
     </button>
 
@@ -1126,6 +1158,14 @@
           <span>Sync</span>
         </button>
 
+        <button class="top-action-btn" id="btn-top-shortcuts" title="Keyboard Shortcuts (?)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"></path>
+          </svg>
+          <span>Shortcuts</span>
+        </button>
+
         <button class="top-action-btn active" id="btn-toggle-intel" title="Toggle Intel & AI Panel (I)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
           <span>Intel & AI</span>
@@ -1209,6 +1249,46 @@
       <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
         <button class="top-action-btn" id="btn-modal-cancel">Cancel</button>
         <button class="top-action-btn active" id="btn-modal-save">Add Stock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Keyboard Shortcuts Modal -->
+  <div class="modal-backdrop" id="modal-shortcuts">
+    <div class="modal-card" style="width: 540px; max-width: 90vw; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+        <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+          <span>⌨️</span>
+          <span>Keyboard Shortcuts Guide</span>
+        </div>
+        <button id="btn-close-shortcuts" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); line-height: 1; padding: 0 4px;">&times;</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px;">
+        <div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;">Navigation & Views</div>
+          <div class="shortcut-row"><span>Previous Stock</span><div><kbd>↑</kbd> or <kbd>k</kbd></div></div>
+          <div class="shortcut-row"><span>Next Stock</span><div><kbd>↓</kbd> or <kbd>j</kbd></div></div>
+          <div class="shortcut-row"><span>Search Stocks</span><div><kbd>/</kbd></div></div>
+          <div class="shortcut-row"><span>Universe / Movers</span><div><kbd>m</kbd></div></div>
+          <div class="shortcut-row"><span>Single Chart View</span><div><kbd>Alt</kbd>+<kbd>1</kbd></div></div>
+          <div class="shortcut-row"><span>Movers Grid View</span><div><kbd>Alt</kbd>+<kbd>2</kbd> or <kbd>g</kbd></div></div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;">Actions & Tools</div>
+          <div class="shortcut-row"><span>Command Palette</span><div><kbd>Ctrl</kbd>+<kbd>k</kbd></div></div>
+          <div class="shortcut-row"><span>Timeframe 5m..1w</span><div><kbd>1</kbd> – <kbd>6</kbd></div></div>
+          <div class="shortcut-row"><span>Remote Sync Data</span><div><kbd>r</kbd></div></div>
+          <div class="shortcut-row"><span>Toggle Theme</span><div><kbd>t</kbd></div></div>
+          <div class="shortcut-row"><span>Intel & Research Drawer</span><div><kbd>i</kbd></div></div>
+          <div class="shortcut-row"><span>Shortcuts Help</span><div><kbd>?</kbd></div></div>
+          <div class="shortcut-row"><span>Close Any Modal</span><div><kbd>Esc</kbd></div></div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
+        <button class="top-action-btn active" id="btn-ok-shortcuts">Got it</button>
       </div>
     </div>
   </div>
@@ -1967,6 +2047,7 @@
       { name: 'Movers: Filter Upward Moves (🚀 Rise / Gainers)', tag: 'rise gainers up', run: () => { tabMovers.click(); const btn = document.querySelector('.filter-pill[data-filter="gainers"]'); if (btn) btn.click(); } },
       { name: 'Movers: Filter Downward Moves (🔻 Fall / Losers)', tag: 'fall losers down', run: () => { tabMovers.click(); const btn = document.querySelector('.filter-pill[data-filter="losers"]'); if (btn) btn.click(); } },
       { name: 'Movers: Show All Movers (Rise & Fall)', tag: 'movers all', run: () => { tabMovers.click(); const btn = document.querySelector('.filter-pill[data-filter="all"]'); if (btn) btn.click(); } },
+      { name: 'Keyboard Shortcuts Cheat Sheet', tag: 'shortcuts help ?', run: openShortcutsModal },
       { name: 'Add New Stock to Universe', tag: 'add', run: () => document.getElementById('modal-add').classList.add('open') },
     ];
 
@@ -1979,6 +2060,16 @@
 
     function closePalette() {
       paletteModal.classList.remove('open');
+    }
+
+    function openShortcutsModal() {
+      const modal = document.getElementById('modal-shortcuts');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeShortcutsModal() {
+      const modal = document.getElementById('modal-shortcuts');
+      if (modal) modal.classList.remove('open');
     }
 
     function renderPaletteList(actions) {
@@ -2018,6 +2109,25 @@
     paletteModal.addEventListener('click', (e) => {
       if (e.target === paletteModal) closePalette();
     });
+
+    const btnRailShortcuts = document.getElementById('btn-rail-shortcuts');
+    if (btnRailShortcuts) btnRailShortcuts.addEventListener('click', openShortcutsModal);
+
+    const btnTopShortcuts = document.getElementById('btn-top-shortcuts');
+    if (btnTopShortcuts) btnTopShortcuts.addEventListener('click', openShortcutsModal);
+
+    const btnCloseShortcuts = document.getElementById('btn-close-shortcuts');
+    if (btnCloseShortcuts) btnCloseShortcuts.addEventListener('click', closeShortcutsModal);
+
+    const btnOkShortcuts = document.getElementById('btn-ok-shortcuts');
+    if (btnOkShortcuts) btnOkShortcuts.addEventListener('click', closeShortcutsModal);
+
+    const modalShortcuts = document.getElementById('modal-shortcuts');
+    if (modalShortcuts) {
+      modalShortcuts.addEventListener('click', (e) => {
+        if (e.target === modalShortcuts) closeShortcutsModal();
+      });
+    }
 
     document.getElementById('btn-rail-watchlist').addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
@@ -2213,51 +2323,72 @@
 
     // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-        if (e.key === 'Escape') {
+      // 1. Command Palette (Ctrl+K or Cmd+K) - prioritize before single-key checks!
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openPalette();
+        return;
+      }
+
+      // 2. Escape key closes modals / palette / shortcuts guide
+      if (e.key === 'Escape') {
+        closePalette();
+        closeShortcutsModal();
+        const addModal = document.getElementById('modal-add');
+        if (addModal) addModal.classList.remove('open');
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
           document.activeElement.blur();
-          closePalette();
-          document.getElementById('modal-add').classList.remove('open');
         }
         return;
       }
 
+      // 3. Skip single-key shortcuts if typing in an input
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        return;
+      }
+
+      // 4. Keyboard Shortcuts Guide (? key or Shift+/)
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        openShortcutsModal();
+        return;
+      }
+
+      // 5. Stock Navigation & Chart Shortcuts (only if no Ctrl/Alt/Meta pressed!)
       const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
-      if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'J') {
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'ArrowDown' || e.key.toLowerCase() === 'j')) {
         e.preventDefault();
         if (activeList.length > 0) selectStock((currentIndex + 1) % activeList.length);
-      } else if (e.key === 'ArrowUp' || e.key === 'k' || e.key === 'K') {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'ArrowUp' || e.key.toLowerCase() === 'k')) {
         e.preventDefault();
         if (activeList.length > 0) selectStock((currentIndex - 1 + activeList.length) % activeList.length);
-      } else if (['1','2','3','4','5','6'].includes(e.key)) {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && ['1','2','3','4','5','6'].includes(e.key)) {
         const tfMap = { '1':'5m', '2':'15m', '3':'30m', '4':'1h', '5':'1d', '6':'1w' };
         setTimeframe(tfMap[e.key]);
-      } else if (e.key === 'r' || e.key === 'R') {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'r') {
         e.preventDefault();
         if (currentTab === 'movers') runScanMovers(true);
         else fetchChartData(true);
-      } else if (e.key === 't' || e.key === 'T') {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 't') {
         e.preventDefault();
         toggleTheme();
-      } else if (e.key === 'm' || e.key === 'M') {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'm') {
         e.preventDefault();
         if (currentTab === 'universe') tabMovers.click();
         else tabUniverse.click();
-      } else if (e.key === 'g' || e.key === 'G') {
+      } else if (e.altKey && e.key === '1') {
+        e.preventDefault();
+        setViewMode('single');
+      } else if ((e.altKey && e.key === '2') || (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'g')) {
         e.preventDefault();
         setViewMode(currentViewMode === 'single' ? 'grid' : 'single');
-      } else if (e.key === 'i' || e.key === 'I') {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'i') {
         e.preventDefault();
         toggleIntelDrawer();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === '/') {
         e.preventDefault();
-        openPalette();
-      } else if (e.key === '/') {
-        e.preventDefault();
-        document.getElementById('search-input').focus();
-      } else if (e.key === 'Escape') {
-        closePalette();
-        document.getElementById('modal-add').classList.remove('open');
+        const searchInp = document.getElementById('search-input');
+        if (searchInp) searchInp.focus();
       }
     });
 
