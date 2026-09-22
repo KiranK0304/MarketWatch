@@ -200,7 +200,7 @@ async fn delete_stock(
 async fn get_candles(
     State(state): State<WebState>,
     Query(params): Query<CandlesQuery>,
-) -> Result<Json<Vec<crate::domain::Candle>>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<Response, (StatusCode, Json<ErrorResponse>)> {
     let timeframe: Timeframe = params
         .timeframe
         .parse()
@@ -214,10 +214,20 @@ async fn get_candles(
         if let Ok(true) = state.db.is_fresh(&params.symbol, tf_label, 60) {
             if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
                 if !cached.is_empty() {
-                    return Ok(Json(cached));
+                    println!("[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)", params.symbol, tf_label, cached.len());
+                    return Ok((
+                        [(header::HeaderName::from_static("x-cache"), "HIT")],
+                        Json(cached),
+                    ).into_response());
                 }
             }
         }
+    }
+
+    if force {
+        println!("[FORCE REFRESH] {} ({}) -> bypassing cache, fetching from Yahoo Finance API...", params.symbol, tf_label);
+    } else {
+        println!("[CACHE MISS] {} ({}) -> cache stale or empty, fetching from Yahoo Finance API...", params.symbol, tf_label);
     }
 
     // 2. Otherwise fetch from Yahoo Provider
@@ -226,21 +236,34 @@ async fn get_candles(
             let now = chrono::Utc::now().timestamp();
             // Cache in SQLite with upsert
             let _ = state.db.save_candles(&params.symbol, tf_label, &candles, now);
+            println!("[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite", params.symbol, tf_label, candles.len());
 
             // Return full accumulated historical candles from DB
-            if let Ok(all_candles) = state.db.get_candles(&params.symbol, tf_label) {
+            let result_candles = if let Ok(all_candles) = state.db.get_candles(&params.symbol, tf_label) {
                 if !all_candles.is_empty() {
-                    return Ok(Json(all_candles));
+                    all_candles
+                } else {
+                    candles
                 }
-            }
-            Ok(Json(candles))
+            } else {
+                candles
+            };
+
+            Ok((
+                [(header::HeaderName::from_static("x-cache"), "MISS")],
+                Json(result_candles),
+            ).into_response())
         }
         Err(e) => {
             // Graceful fallback: If network request failed or rate-limited,
             // return any cached candles we already have in SQLite
             if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
                 if !cached.is_empty() {
-                    return Ok(Json(cached));
+                    println!("[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite", params.symbol, tf_label, cached.len());
+                    return Ok((
+                        [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
+                        Json(cached),
+                    ).into_response());
                 }
             }
             Err((

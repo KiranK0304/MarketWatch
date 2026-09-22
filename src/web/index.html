@@ -1565,6 +1565,9 @@
           throw new Error(err.error || 'Failed to fetch');
         }
 
+        const cacheHeader = res.headers.get('x-cache') || 'UNKNOWN';
+        console.log(`%c[MarketWatch] ${stock.symbol} (${currentTimeframe}) -> Cache: ${cacheHeader}`, cacheHeader === 'HIT' ? 'color: #10b981; font-weight: bold;' : 'color: #3b82f6; font-weight: bold;');
+
         candleData = await res.json();
         renderChartData(candleData);
       } catch (e) {
