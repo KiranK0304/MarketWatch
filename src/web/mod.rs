@@ -113,6 +113,14 @@ async fn add_stock(
             }),
         ));
     }
+    if new_stock.name.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Stock name cannot be empty".to_string(),
+            }),
+        ));
+    }
 
     if config
         .stocks
@@ -211,15 +219,25 @@ async fn get_candles(
 
     // 1. Check if SQLite cache is already fresh (60s TTL during market hours, or market closed)
     if !force {
-        if let Ok(true) = state.db.is_fresh(&params.symbol, tf_label, 60) {
-            if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
-                if !cached.is_empty() {
-                    println!("[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)", params.symbol, tf_label, cached.len());
-                    return Ok((
-                        [(header::HeaderName::from_static("x-cache"), "HIT")],
-                        Json(cached),
-                    ).into_response());
-                }
+        let fresh = state.db.is_fresh(&params.symbol, tf_label, 60).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: e.to_string() }),
+            )
+        })?;
+        if fresh {
+            let cached = state.db.get_candles(&params.symbol, tf_label).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse { error: e.to_string() }),
+                )
+            })?;
+            if !cached.is_empty() {
+                println!("[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)", params.symbol, tf_label, cached.len());
+                return Ok((
+                    [(header::HeaderName::from_static("x-cache"), "HIT")],
+                    Json(cached),
+                ).into_response());
             }
         }
     }
@@ -235,19 +253,22 @@ async fn get_candles(
         Ok(candles) => {
             let now = chrono::Utc::now().timestamp();
             // Cache in SQLite with upsert
-            let _ = state.db.save_candles(&params.symbol, tf_label, &candles, now);
+            state.db.save_candles(&params.symbol, tf_label, &candles, now).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse { error: e.to_string() }),
+                )
+            })?;
             println!("[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite", params.symbol, tf_label, candles.len());
 
             // Return full accumulated historical candles from DB
-            let result_candles = if let Ok(all_candles) = state.db.get_candles(&params.symbol, tf_label) {
-                if !all_candles.is_empty() {
-                    all_candles
-                } else {
-                    candles
-                }
-            } else {
-                candles
-            };
+            let all_candles = state.db.get_candles(&params.symbol, tf_label).map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse { error: e.to_string() }),
+                )
+            })?;
+            let result_candles = if all_candles.is_empty() { candles } else { all_candles };
 
             Ok((
                 [(header::HeaderName::from_static("x-cache"), "MISS")],
@@ -257,17 +278,21 @@ async fn get_candles(
         Err(e) => {
             // Graceful fallback: If network request failed or rate-limited,
             // return any cached candles we already have in SQLite
-            if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
-                if !cached.is_empty() {
-                    println!("[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite", params.symbol, tf_label, cached.len());
-                    return Ok((
-                        [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
-                        Json(cached),
-                    ).into_response());
-                }
+            let cached = state.db.get_candles(&params.symbol, tf_label).map_err(|db_error| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse { error: db_error.to_string() }),
+                )
+            })?;
+            if !cached.is_empty() {
+                println!("[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite", params.symbol, tf_label, cached.len());
+                return Ok((
+                    [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
+                    Json(cached),
+                ).into_response());
             }
             Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::BAD_GATEWAY,
                 Json(ErrorResponse {
                     error: e.to_string(),
                 }),

@@ -44,11 +44,10 @@ impl<P: MarketDataProvider> CachedProvider<P> {
 
         // If not forcing refresh, check if DB cache is already fresh
         if !force {
-            if let Ok(true) = self.db.is_fresh(symbol, tf_label, self.ttl_secs) {
-                if let Ok(cached) = self.db.get_candles(symbol, tf_label) {
-                    if !cached.is_empty() {
-                        return Ok((cached, true));
-                    }
+            if self.db.is_fresh(symbol, tf_label, self.ttl_secs)? {
+                let cached = self.db.get_candles(symbol, tf_label)?;
+                if !cached.is_empty() {
+                    return Ok((cached, true));
                 }
             }
         }
@@ -57,23 +56,21 @@ impl<P: MarketDataProvider> CachedProvider<P> {
         match self.inner.fetch_candles(symbol, timeframe).await {
             Ok(candles) => {
                 let now = chrono::Utc::now().timestamp();
-                let _ = self.db.save_candles(symbol, tf_label, &candles, now);
+                self.db.save_candles(symbol, tf_label, &candles, now)?;
 
                 // Return full accumulated candles from SQLite
-                if let Ok(all_candles) = self.db.get_candles(symbol, tf_label) {
-                    if !all_candles.is_empty() {
-                        return Ok((all_candles, false));
-                    }
+                let all_candles = self.db.get_candles(symbol, tf_label)?;
+                if !all_candles.is_empty() {
+                    return Ok((all_candles, false));
                 }
                 Ok((candles, false))
             }
             Err(e) => {
                 // Graceful fallback: If network request failed or was rate-limited,
                 // check if we have any historical cached data in SQLite to display
-                if let Ok(cached) = self.db.get_candles(symbol, tf_label) {
-                    if !cached.is_empty() {
-                        return Ok((cached, true));
-                    }
+                let cached = self.db.get_candles(symbol, tf_label)?;
+                if !cached.is_empty() {
+                    return Ok((cached, true));
                 }
                 Err(e)
             }
