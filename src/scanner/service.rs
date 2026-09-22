@@ -125,17 +125,26 @@ X-GNOME-Autostart-enabled=true
         println!("✓ Wrote {}", autostart_file.display());
 
         // Reload systemd user daemon and enable units
-        let _ = Command::new("systemctl")
+        let daemon_reload = Command::new("systemctl")
             .args(["--user", "daemon-reload"])
-            .status();
+            .status()?;
+        if !daemon_reload.success() {
+            anyhow::bail!("systemctl --user daemon-reload failed");
+        }
 
-        let _ = Command::new("systemctl")
+        let scanner_status = Command::new("systemctl")
             .args(["--user", "enable", "--now", "marketwatch-scanner.timer"])
-            .status();
+            .status()?;
+        if !scanner_status.success() {
+            anyhow::bail!("failed to enable marketwatch-scanner.timer");
+        }
 
-        let _ = Command::new("systemctl")
+        let web_status = Command::new("systemctl")
             .args(["--user", "enable", "--now", "marketwatch-web.service"])
-            .status();
+            .status()?;
+        if !web_status.success() {
+            anyhow::bail!("failed to enable marketwatch-web.service");
+        }
 
         println!("✓ Enabled and started systemd user timer: marketwatch-scanner.timer");
         println!("✓ Enabled and started background web server: marketwatch-web.service (localhost:3000)");
