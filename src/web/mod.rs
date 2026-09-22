@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{delete, get};
 use axum::{Json, Router};
@@ -68,10 +68,7 @@ async fn serve_index() -> impl IntoResponse {
 
 /// Serve the favicon.
 async fn serve_favicon() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "image/svg+xml")],
-        FAVICON_SVG,
-    )
+    ([(header::CONTENT_TYPE, "image/svg+xml")], FAVICON_SVG)
 }
 
 /// Get all stocks in the universe.
@@ -110,6 +107,14 @@ async fn add_stock(
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
                 error: "Stock symbol cannot be empty".to_string(),
+            }),
+        ));
+    }
+    if new_stock.name.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Stock name cannot be empty".to_string(),
             }),
         ));
     }
@@ -211,63 +216,137 @@ async fn get_candles(
 
     // 1. Check if SQLite cache is already fresh (60s TTL during market hours, or market closed)
     if !force {
-        if let Ok(true) = state.db.is_fresh(&params.symbol, tf_label, 60) {
-            if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
-                if !cached.is_empty() {
-                    println!("[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)", params.symbol, tf_label, cached.len());
-                    return Ok((
-                        [(header::HeaderName::from_static("x-cache"), "HIT")],
-                        Json(cached),
-                    ).into_response());
-                }
+        let fresh = state
+            .db
+            .is_fresh(&params.symbol, tf_label, 60)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: e.to_string(),
+                    }),
+                )
+            })?;
+        if fresh {
+            let cached = state
+                .db
+                .get_candles(&params.symbol, tf_label)
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: e.to_string(),
+                        }),
+                    )
+                })?;
+            if !cached.is_empty() {
+                println!(
+                    "[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)",
+                    params.symbol,
+                    tf_label,
+                    cached.len()
+                );
+                return Ok((
+                    [(header::HeaderName::from_static("x-cache"), "HIT")],
+                    Json(cached),
+                )
+                    .into_response());
             }
         }
     }
 
     if force {
-        println!("[FORCE REFRESH] {} ({}) -> bypassing cache, fetching from Yahoo Finance API...", params.symbol, tf_label);
+        println!(
+            "[FORCE REFRESH] {} ({}) -> bypassing cache, fetching from Yahoo Finance API...",
+            params.symbol, tf_label
+        );
     } else {
-        println!("[CACHE MISS] {} ({}) -> cache stale or empty, fetching from Yahoo Finance API...", params.symbol, tf_label);
+        println!(
+            "[CACHE MISS] {} ({}) -> cache stale or empty, fetching from Yahoo Finance API...",
+            params.symbol, tf_label
+        );
     }
 
     // 2. Otherwise fetch from Yahoo Provider
-    match state.provider.fetch_candles(&params.symbol, timeframe).await {
+    match state
+        .provider
+        .fetch_candles(&params.symbol, timeframe)
+        .await
+    {
         Ok(candles) => {
             let now = chrono::Utc::now().timestamp();
             // Cache in SQLite with upsert
-            let _ = state.db.save_candles(&params.symbol, tf_label, &candles, now);
-            println!("[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite", params.symbol, tf_label, candles.len());
+            state
+                .db
+                .save_candles(&params.symbol, tf_label, &candles, now)
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: e.to_string(),
+                        }),
+                    )
+                })?;
+            println!(
+                "[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite",
+                params.symbol,
+                tf_label,
+                candles.len()
+            );
 
             // Return full accumulated historical candles from DB
-            let result_candles = if let Ok(all_candles) = state.db.get_candles(&params.symbol, tf_label) {
-                if !all_candles.is_empty() {
-                    all_candles
-                } else {
-                    candles
-                }
-            } else {
+            let all_candles = state
+                .db
+                .get_candles(&params.symbol, tf_label)
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: e.to_string(),
+                        }),
+                    )
+                })?;
+            let result_candles = if all_candles.is_empty() {
                 candles
+            } else {
+                all_candles
             };
 
             Ok((
                 [(header::HeaderName::from_static("x-cache"), "MISS")],
                 Json(result_candles),
-            ).into_response())
+            )
+                .into_response())
         }
         Err(e) => {
             // Graceful fallback: If network request failed or rate-limited,
             // return any cached candles we already have in SQLite
-            if let Ok(cached) = state.db.get_candles(&params.symbol, tf_label) {
-                if !cached.is_empty() {
-                    println!("[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite", params.symbol, tf_label, cached.len());
-                    return Ok((
-                        [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
-                        Json(cached),
-                    ).into_response());
-                }
+            let cached = state
+                .db
+                .get_candles(&params.symbol, tf_label)
+                .map_err(|db_error| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: db_error.to_string(),
+                        }),
+                    )
+                })?;
+            if !cached.is_empty() {
+                println!(
+                    "[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite",
+                    params.symbol,
+                    tf_label,
+                    cached.len()
+                );
+                return Ok((
+                    [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
+                    Json(cached),
+                )
+                    .into_response());
             }
             Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::BAD_GATEWAY,
                 Json(ErrorResponse {
                     error: e.to_string(),
                 }),
@@ -288,38 +367,37 @@ async fn scan_movers(
     let mut scan_state = ScanState::load(&state_path);
 
     let now = chrono::Utc::now().timestamp();
-    if !force {
-        if let Some(ref last) = scan_state.last_scan_result {
-            // If scan is less than 3 minutes old, filter locally
-            if (now - last.timestamp).abs() < 180 {
-                let mut movers: Vec<StockMover> = last
-                    .all_quotes
-                    .iter()
-                    .filter(|m| m.matches_threshold(threshold))
-                    .cloned()
-                    .collect();
+    if !force
+        && let Some(ref last) = scan_state.last_scan_result
+        // If scan is less than 3 minutes old, filter locally
+        && (now - last.timestamp).abs() < 180
+    {
+        let mut movers: Vec<StockMover> = last
+            .all_quotes
+            .iter()
+            .filter(|m| m.matches_threshold(threshold))
+            .cloned()
+            .collect();
 
-                movers.sort_by(|a, b| {
-                    b.change_percent
-                        .abs()
-                        .partial_cmp(&a.change_percent.abs())
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
+        movers.sort_by(|a, b| {
+            b.change_percent
+                .abs()
+                .partial_cmp(&a.change_percent.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
-                let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
-                let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
-                let movers_count = movers.len();
+        let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
+        let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
+        let movers_count = movers.len();
 
-                let mut updated = last.clone();
-                updated.threshold_percent = threshold;
-                updated.movers_count = movers_count;
-                updated.gainers_count = gainers_count;
-                updated.losers_count = losers_count;
-                updated.movers = movers;
+        let mut updated = last.clone();
+        updated.threshold_percent = threshold;
+        updated.movers_count = movers_count;
+        updated.gainers_count = gainers_count;
+        updated.losers_count = losers_count;
+        updated.movers = movers;
 
-                return Ok(Json(updated));
-            }
-        }
+        return Ok(Json(updated));
     }
 
     let config = config::load_stock_config(&state.config_path).map_err(|e| {
@@ -332,17 +410,14 @@ async fn scan_movers(
     })?;
 
     let scanner = Scanner::new(state.provider.clone());
-    let result = scanner
-        .scan(&config.stocks, threshold)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    error: e.to_string(),
-                }),
-            )
-        })?;
+    let result = scanner.scan(&config.stocks, threshold).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
 
     scan_state.last_scan_result = Some(result.clone());
     let _ = scan_state.save(&state_path);

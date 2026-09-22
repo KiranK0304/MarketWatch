@@ -14,6 +14,17 @@ use std::process::Command;
 pub struct ServiceManager;
 
 impl ServiceManager {
+    fn unit_arg(value: &str) -> String {
+        if value
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '"' | '\\'))
+        {
+            format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+        } else {
+            value.to_string()
+        }
+    }
+
     /// Get path to the compiled market executable.
     pub fn executable_path() -> PathBuf {
         if let Ok(exe) = std::env::current_exe() {
@@ -34,9 +45,9 @@ impl ServiceManager {
         let home = std::env::var("HOME")
             .map_err(|_| anyhow::anyhow!("HOME environment variable not set"))?;
         let exe_path = Self::executable_path();
-        let exe_str = exe_path.to_str().unwrap_or("market");
+        let exe_str = Self::unit_arg(exe_path.to_str().unwrap_or("market"));
         let work_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from(&home));
-        let work_dir_str = work_dir.to_str().unwrap_or("");
+        let work_dir_str = Self::unit_arg(work_dir.to_str().unwrap_or(""));
 
         let systemd_dir = PathBuf::from(&home).join(".config/systemd/user");
         let autostart_dir = PathBuf::from(&home).join(".config/autostart");
@@ -70,6 +81,7 @@ Description=MarketWatch Scheduled Scanner (09:30 AM & 03:30 PM IST)
 [Timer]
 OnCalendar=Mon..Fri 09:30:00
 OnCalendar=Mon..Fri 15:30:00
+Timezone=Asia/Kolkata
 Persistent=true
 
 [Install]
@@ -124,22 +136,35 @@ X-GNOME-Autostart-enabled=true
         println!("✓ Wrote {}", autostart_file.display());
 
         // Reload systemd user daemon and enable units
-        let _ = Command::new("systemctl")
+        let daemon_reload = Command::new("systemctl")
             .args(["--user", "daemon-reload"])
-            .status();
+            .status()?;
+        if !daemon_reload.success() {
+            anyhow::bail!("systemctl --user daemon-reload failed");
+        }
 
-        let _ = Command::new("systemctl")
+        let scanner_status = Command::new("systemctl")
             .args(["--user", "enable", "--now", "marketwatch-scanner.timer"])
-            .status();
+            .status()?;
+        if !scanner_status.success() {
+            anyhow::bail!("failed to enable marketwatch-scanner.timer");
+        }
 
-        let _ = Command::new("systemctl")
+        let web_status = Command::new("systemctl")
             .args(["--user", "enable", "--now", "marketwatch-web.service"])
-            .status();
+            .status()?;
+        if !web_status.success() {
+            anyhow::bail!("failed to enable marketwatch-web.service");
+        }
 
         println!("✓ Enabled and started systemd user timer: marketwatch-scanner.timer");
-        println!("✓ Enabled and started background web server: marketwatch-web.service (localhost:3000)");
+        println!(
+            "✓ Enabled and started background web server: marketwatch-web.service (localhost:3000)"
+        );
         println!("  Schedule: Mon-Fri at 09:30 AM and 03:30 PM IST");
-        println!("  Persistent=true: If laptop is closed/off, scans catch up instantly when turned on!");
+        println!(
+            "  Persistent=true: If laptop is closed/off, scans catch up instantly when turned on!"
+        );
         println!("  Clicking the notification will directly open http://localhost:3000!");
 
         Ok(())
@@ -181,7 +206,12 @@ X-GNOME-Autostart-enabled=true
     pub fn status() {
         println!("\n=== MarketWatch Scheduled Timer ===");
         let _ = Command::new("systemctl")
-            .args(["--user", "status", "marketwatch-scanner.timer", "--no-pager"])
+            .args([
+                "--user",
+                "status",
+                "marketwatch-scanner.timer",
+                "--no-pager",
+            ])
             .status();
 
         println!("\n=== MarketWatch Web Server (localhost:3000) ===");

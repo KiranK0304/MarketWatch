@@ -32,8 +32,12 @@ impl YahooProvider {
     /// Fetch latest market quote and price change for a stock mover.
     pub async fn fetch_mover(&self, symbol: &str, name: &str) -> Result<StockMover, MarketError> {
         let endpoints = [
-            format!("https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"),
-            format!("https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"),
+            format!(
+                "https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
+            ),
+            format!(
+                "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
+            ),
         ];
 
         let mut last_error = None;
@@ -363,17 +367,17 @@ fn convert_to_mover(
 
     let volume = meta
         .and_then(|m| m.regular_market_volume)
-        .or_else(|| quote.and_then(|q| q.volume.iter().filter_map(|&v| v).last()))
+        .or_else(|| quote.and_then(|q| q.volume.iter().filter_map(|&v| v).next_back()))
         .unwrap_or(0);
 
     let day_high = meta
         .and_then(|m| m.regular_market_day_high)
-        .or_else(|| quote.and_then(|q| q.high.iter().filter_map(|&h| h).last()))
+        .or_else(|| quote.and_then(|q| q.high.iter().filter_map(|&h| h).next_back()))
         .unwrap_or(price);
 
     let day_low = meta
         .and_then(|m| m.regular_market_day_low)
-        .or_else(|| quote.and_then(|q| q.low.iter().filter_map(|&l| l).last()))
+        .or_else(|| quote.and_then(|q| q.low.iter().filter_map(|&l| l).next_back()))
         .unwrap_or(price);
 
     let timestamp = meta

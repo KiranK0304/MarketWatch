@@ -10,4 +10,4 @@ pub use engine::Scanner;
 pub use notifier::{open_dashboard, send_desktop_notification, show_popup_dialog};
 pub use service::ServiceManager;
 #[allow(unused_imports)]
-pub use state::{now_ist, ScanState, ScheduledSlot};
+pub use state::{ScanState, ScheduledSlot, now_ist};

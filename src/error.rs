@@ -78,4 +78,3 @@ impl From<rusqlite::Error> for MarketError {
         MarketError::Database(e.to_string())
     }
 }
-

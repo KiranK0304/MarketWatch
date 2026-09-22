@@ -1339,6 +1339,15 @@
       return Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
     function formatVol(val) {
       if (val >= 1e7) return (val / 1e7).toFixed(2) + ' Cr';
       if (val >= 1e5) return (val / 1e5).toFixed(2) + ' L';
@@ -1534,6 +1543,10 @@
     async function loadStocks() {
       try {
         const res = await fetch('/api/stocks');
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to load stock list');
+        }
         stocks = await res.json();
         document.getElementById('count-universe').textContent = stocks.length;
         renderStockList();
@@ -1557,10 +1570,10 @@
         li.className = 'stock-row' + (idx === currentIndex && currentTab === 'universe' ? ' active' : '');
         li.innerHTML = `
           <div>
-            <div class="stock-sym-title">${s.symbol}</div>
-            <div class="stock-corp-name">${s.name}</div>
+            <div class="stock-sym-title">${escapeHtml(s.symbol)}</div>
+            <div class="stock-corp-name">${escapeHtml(s.name)}</div>
           </div>
-          <button style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px;" onclick="event.stopPropagation(); deleteStock('${s.symbol}')">✕</button>
+          <button style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px;" onclick="event.stopPropagation(); deleteStock('${encodeURIComponent(s.symbol)}')">✕</button>
         `;
         li.addEventListener('click', () => {
           selectStock(idx);
@@ -1641,6 +1654,10 @@
     async function loadCachedMovers() {
       try {
         const res = await fetch(`/api/scan/cached?threshold=${currentThreshold}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to load cached scan');
+        }
         const data = await res.json();
         if (data) {
           moversData = data;
@@ -1713,8 +1730,8 @@
         const isUp = m.change_percent >= 0;
         li.innerHTML = `
           <div>
-            <div class="stock-sym-title">${m.symbol}</div>
-            <div class="stock-corp-name">${m.name}</div>
+            <div class="stock-sym-title">${escapeHtml(m.symbol)}</div>
+            <div class="stock-corp-name">${escapeHtml(m.name)}</div>
           </div>
           <div style="text-align: right;">
             <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 600;">₹${formatPrice(m.price)}</div>
@@ -1779,8 +1796,8 @@
         card.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${m.symbol}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">${m.name}</div>
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${escapeHtml(m.symbol)}</div>
+              <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(m.name)}</div>
             </div>
             <div style="text-align: right;">
               <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">₹${formatPrice(m.price)}</div>
@@ -2092,7 +2109,7 @@
         .filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
         .slice(0, 5)
         .map(s => ({
-          name: `Switch to ${s.symbol} (${s.name})`,
+          name: `Switch to ${escapeHtml(s.symbol)} (${escapeHtml(s.name)})`,
           tag: 'stock',
           run: () => {
             const idx = stocks.findIndex(x => x.symbol === s.symbol);

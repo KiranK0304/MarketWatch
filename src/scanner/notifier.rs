@@ -24,7 +24,9 @@ pub fn is_server_listening(port: u16) -> bool {
 /// Ensure MarketWatch web server is running and open browser to `http://localhost:{port}`.
 pub fn open_dashboard(port: u16) {
     if !is_server_listening(port) {
-        println!("MarketWatch web server is not running on port {port}. Starting it in background...");
+        println!(
+            "MarketWatch web server is not running on port {port}. Starting it in background..."
+        );
         let exe = ServiceManager::executable_path();
         let _ = Command::new(exe)
             .args(["--web", "--port", &port.to_string(), "--no-browser"])
@@ -50,8 +52,14 @@ pub fn open_dashboard(port: u16) {
 /// Dispatches a formatted, prominent desktop notification with click-to-open action.
 pub fn send_desktop_notification(result: &ScanResult, slot_label: Option<&str>) -> bool {
     let title = match slot_label {
-        Some(label) => format!("📈 MarketWatch Movers — {label} (±{:.1}%)", result.threshold_percent),
-        None => format!("📈 MarketWatch Movers Alert (±{:.1}%)", result.threshold_percent),
+        Some(label) => format!(
+            "📈 MarketWatch Movers — {label} (±{:.1}%)",
+            result.threshold_percent
+        ),
+        None => format!(
+            "📈 MarketWatch Movers Alert (±{:.1}%)",
+            result.threshold_percent
+        ),
     };
 
     let mut body = String::new();
@@ -131,7 +139,9 @@ pub fn send_desktop_notification(result: &ScanResult, slot_label: Option<&str>) 
         }
     });
 
-    println!("✓ Prominent desktop notification dispatched. Click it anytime to open localhost:3000!");
+    println!(
+        "✓ Prominent desktop notification dispatched. Click it anytime to open localhost:3000!"
+    );
     true
 }
 
@@ -139,7 +149,10 @@ pub fn send_desktop_notification(result: &ScanResult, slot_label: Option<&str>) 
 pub fn show_popup_dialog(result: &ScanResult, slot_label: Option<&str>) {
     let title = match slot_label {
         Some(label) => format!("MarketWatch Movers Alert — {label}"),
-        None => format!("MarketWatch Movers Alert (±{:.1}%)", result.threshold_percent),
+        None => format!(
+            "MarketWatch Movers Alert (±{:.1}%)",
+            result.threshold_percent
+        ),
     };
 
     let mut text = format!(
@@ -189,9 +202,9 @@ pub fn show_popup_dialog(result: &ScanResult, slot_label: Option<&str>) {
         "--width=480",
     ]);
 
-    if let Ok(status) = cmd.status() {
-        if status.success() {
-            open_dashboard(3000);
-        }
+    if let Ok(status) = cmd.status()
+        && status.success()
+    {
+        open_dashboard(3000);
     }
 }
