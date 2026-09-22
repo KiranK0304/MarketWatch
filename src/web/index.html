@@ -1384,6 +1384,15 @@
       return (val || 0).toString();
     }
 
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
     // Initialize Main Chart
     function initChart() {
       if (chart) {
@@ -1642,6 +1651,10 @@
     async function loadStocks() {
       try {
         const res = await fetch('/api/stocks');
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to load stocks');
+        }
         stocks = await res.json();
         document.getElementById('tab-universe-count').textContent = stocks.length;
         stockCountEl.textContent = `${stocks.length} stocks`;
@@ -1667,10 +1680,10 @@
         li.className = 'stock-item' + (idx === currentIndex ? ' active' : '');
         li.innerHTML = `
           <div class="stock-item-info">
-            <span class="stock-item-symbol">${s.symbol}</span>
-            <span class="stock-item-name">${s.name}</span>
+            <span class="stock-item-symbol">${escapeHtml(s.symbol)}</span>
+            <span class="stock-item-name">${escapeHtml(s.name)}</span>
           </div>
-          <button class="stock-delete-btn" title="Remove from universe" data-symbol="${s.symbol}">×</button>
+          <button class="stock-delete-btn" title="Remove from universe" data-symbol="${escapeHtml(s.symbol)}">×</button>
         `;
 
         li.addEventListener('click', (e) => {
@@ -1765,6 +1778,10 @@
     async function loadCachedMovers() {
       try {
         const res = await fetch(`/api/scan/cached?threshold=${currentThreshold}`);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to load cached scan');
+        }
         const data = await res.json();
         if (data) {
           moversData = data;
@@ -1845,8 +1862,8 @@
 
         li.innerHTML = `
           <div class="stock-item-info">
-            <span class="stock-item-symbol">${m.symbol}</span>
-            <span class="stock-item-name">${m.name}</span>
+            <span class="stock-item-symbol">${escapeHtml(m.symbol)}</span>
+            <span class="stock-item-name">${escapeHtml(m.name)}</span>
           </div>
           <div class="stock-item-right">
             <span class="stock-item-price">₹${formatPrice(m.price)}</span>
@@ -1930,15 +1947,15 @@
         card.innerHTML = `
           <div class="grid-chart-header">
             <div class="grid-chart-title">
-              <span class="grid-chart-sym">${mover.symbol}</span>
-              <span class="grid-chart-nm">${mover.name}</span>
+              <span class="grid-chart-sym">${escapeHtml(mover.symbol)}</span>
+              <span class="grid-chart-nm">${escapeHtml(mover.name)}</span>
             </div>
             <div class="grid-chart-metrics">
               <span class="grid-chart-price">₹${formatPrice(mover.price)}</span>
               <span class="stock-badge ${isUp ? 'up' : 'down'}">${sign}${mover.change_percent.toFixed(2)}%</span>
             </div>
           </div>
-          <div class="grid-chart-body" id="chart-card-${mover.symbol}"></div>
+          <div class="grid-chart-body" id="chart-card-${escapeHtml(mover.symbol)}"></div>
         `;
 
         // Click card to open in single chart view
