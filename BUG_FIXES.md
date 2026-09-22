@@ -88,6 +88,6 @@ Commit: `fix(web): handle API errors and escape user content`
 - Targeted scheduler test for both missed slots
 - Web server smoke test and API status checks
 
-Strict Clippy diagnostics that were already present in the audited codebase
-are separate style/quality issues and were not mixed into the functional
-commits.
+The final branch also passes strict Clippy. The cleanup is isolated in
+`style: satisfy strict clippy checks` so the functional fixes remain easy to
+review independently.
