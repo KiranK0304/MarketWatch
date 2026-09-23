@@ -26,6 +26,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const consumedForceRefreshRef = useRef(0);
 
   const [candleData, setCandleData] = useState<Candle[]>([]);
   const [ohlc, setOhlc] = useState({
@@ -146,10 +147,12 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
 
     async function loadData() {
       try {
+        const force = forceRefreshCounter > consumedForceRefreshRef.current;
+        consumedForceRefreshRef.current = forceRefreshCounter;
         const { candles, cacheHeader } = await api.getCandles(
           activeStock!.symbol,
           timeframe,
-          forceRefreshCounter > 0
+          force
         );
 
         if (!isSubscribed) return;
