@@ -1795,6 +1795,7 @@
     let journalFilterScope = 'stock'; // 'stock' | 'all'
     let journalFilterStatus = 'all'; // 'all' | 'open' | 'validated' | 'invalidated'
     let journalRenderGen = 0;
+    let chartRequestGen = 0;
 
     // Elements
     const sidebar = document.getElementById('sidebar');
@@ -1953,16 +1954,26 @@
       if (activeList.length === 0) return;
       const stock = activeList[currentIndex] || activeList[0];
       if (!stock) return;
+      const requestGen = ++chartRequestGen;
+      const requestedSymbol = stock.symbol;
+      const requestedTimeframe = currentTimeframe;
 
-      document.getElementById('hero-sym').textContent = stock.symbol;
+      document.getElementById('hero-sym').textContent = requestedSymbol;
 
       const startTime = performance.now();
       try {
-        const url = `/api/candles?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}${force ? '&force=true' : ''}`;
+        const url = `/api/candles?symbol=${encodeURIComponent(requestedSymbol)}&timeframe=${requestedTimeframe}${force ? '&force=true' : ''}`;
         const res = await fetch(url);
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.error || 'Failed to fetch');
+        }
+        if (
+          requestGen !== chartRequestGen
+          || currentTimeframe !== requestedTimeframe
+          || (currentTab === 'movers' ? getFilteredMovers()[currentIndex]?.symbol : stocks[currentIndex]?.symbol) !== requestedSymbol
+        ) {
+          return;
         }
 
         const cacheHeader = res.headers.get('x-cache') || 'UNKNOWN';
