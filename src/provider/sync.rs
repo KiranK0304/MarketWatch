@@ -124,10 +124,64 @@ impl CandleSyncService {
                 }
             }
 
+            // Inspect the primary's outcome: a primary that served stale
+            // cache on upstream failure must not look like a clean hit.
+            let primary_error: Option<String> = match &*receiver.borrow() {
+                Some(Err(msg)) => Some(msg.clone()),
+                _ => None,
+            };
+
             // Read the freshly committed data from SQLite
             let cached = self.db.get_candles(&sym_upper, tf_label)?;
             if !cached.is_empty() {
-                return Ok((cached, SyncStatus::CoalescedHit));
+                match primary_error {
+                    Some(msg) => return Ok((cached, SyncStatus::StaleFallback(msg))),
+                    None => return Ok((cached, SyncStatus::CoalescedHit)),
+                }
+            }
+            if let Some(msg) = primary_error {
+                // Primary failed with nothing cached: propagate instead of
+                // firing our own duplicate upstream request.
+                return Err(MarketError::Provider {
+                    status: 0,
+                    symbol: sym_upper.clone(),
+                    body: msg,
+                });
+            }
+            // Primary finished with empty cache and no error (first-load race):
+            // fall through and become the new primary below.
+            {
+                let mut guard = self.in_flight.lock().await;
+                if let Some(existing_tx) = guard.get(&key) {
+                    // Another task registered meanwhile; wait on it.
+                    *receiver = existing_tx.subscribe();
+                    while receiver.borrow().is_none() {
+                        if receiver.changed().await.is_err() {
+                            break;
+                        }
+                    }
+                    let retry_err: Option<String> = match &*receiver.borrow() {
+                        Some(Err(msg)) => Some(msg.clone()),
+                        _ => None,
+                    };
+                    let cached = self.db.get_candles(&sym_upper, tf_label)?;
+                    if !cached.is_empty() {
+                        match retry_err {
+                            Some(msg) => return Ok((cached, SyncStatus::StaleFallback(msg))),
+                            None => return Ok((cached, SyncStatus::CoalescedHit)),
+                        }
+                    }
+                    if let Some(msg) = retry_err {
+                        return Err(MarketError::Provider {
+                            status: 0,
+                            symbol: sym_upper.clone(),
+                            body: msg,
+                        });
+                    }
+                } else {
+                    let (tx, _rx) = watch::channel(None);
+                    guard.insert(key.clone(), tx);
+                }
             }
         }
 
@@ -176,14 +230,26 @@ impl CandleSyncService {
         let fetch_result = match meta {
             Some(ref m) if m.candle_count > 0 && !force => {
                 let gaps = self.db.detect_gaps(symbol, timeframe)?;
+                // One gap's failure must not abort the remaining gaps or the
+                // incremental tail fetch; leftover gaps stay flagged via the
+                // final detect_gaps below and are retried next sync.
                 for (gap_start, gap_end) in gaps {
                     let gap_end = gap_end.saturating_add(timeframe.seconds());
-                    let candles = self
+                    match self
                         .provider
                         .fetch_candles_range(symbol, timeframe, gap_start, gap_end)
-                        .await?;
-                    self.db
-                        .save_candles(symbol, tf_label, &candles, now_epoch)?;
+                        .await
+                    {
+                        Ok(candles) => {
+                            self.db
+                                .save_candles(symbol, tf_label, &candles, now_epoch)?;
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "Warning: gap backfill {gap_start}..{gap_end} for {symbol} failed: {e}"
+                            );
+                        }
+                    }
                 }
 
                 // Incremental fetch: query from the last stored candle up to now.

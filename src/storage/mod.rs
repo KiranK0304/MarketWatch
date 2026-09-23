@@ -56,7 +56,12 @@ impl MarketDb {
     /// Open or create a database at a specific path.
     pub fn open(path: &Path) -> Result<Self, MarketError> {
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent).map_err(|e| {
+                MarketError::Database(format!(
+                    "Failed to create DB dir '{}': {e}",
+                    parent.display()
+                ))
+            })?;
         }
 
         let conn = Connection::open(path)?;
@@ -108,13 +113,31 @@ impl MarketDb {
             .unwrap_or(false);
 
         if candles_table_exists {
-            // Seed tickers table with any existing symbols in candles or cache_sync_meta
-            let _ = conn.execute_batch(
+            // Seed tickers table with any existing symbols in candles or cache_sync_meta.
+            // Each source is seeded independently so a legacy DB missing one
+            // table still seeds from the other instead of failing silently.
+            conn.execute(
                 "INSERT OR IGNORE INTO tickers (symbol, name, exchange, is_active, created_at)
-                 SELECT DISTINCT symbol, symbol, 'NSE', 1, CAST(strftime('%s', 'now') AS INTEGER) FROM candles;
-                 INSERT OR IGNORE INTO tickers (symbol, name, exchange, is_active, created_at)
-                 SELECT DISTINCT symbol, symbol, 'NSE', 1, CAST(strftime('%s', 'now') AS INTEGER) FROM cache_sync_meta;",
-            );
+                 SELECT DISTINCT symbol, symbol, 'NSE', 1, CAST(strftime('%s', 'now') AS INTEGER) FROM candles;",
+                [],
+            )?;
+            let meta_exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='cache_sync_meta'",
+                    [],
+                    |row| {
+                        let count: i64 = row.get(0)?;
+                        Ok(count > 0)
+                    },
+                )
+                .unwrap_or(false);
+            if meta_exists {
+                conn.execute(
+                    "INSERT OR IGNORE INTO tickers (symbol, name, exchange, is_active, created_at)
+                     SELECT DISTINCT symbol, symbol, 'NSE', 1, CAST(strftime('%s', 'now') AS INTEGER) FROM cache_sync_meta;",
+                    [],
+                )?;
+            }
 
             // Check if candles already has foreign key configured
             let candles_has_fk: bool = {
@@ -124,50 +147,59 @@ impl MarketDb {
             };
 
             if !candles_has_fk {
-                // Migrate candles and cache_sync_meta to include FOREIGN KEY constraints
-                conn.execute_batch(
+                // Migrate candles and cache_sync_meta to include FOREIGN KEY constraints.
+                // On failure, roll back and re-enable FK enforcement so the
+                // pooled connection never keeps running with FKs silently off
+                // (which would break ON DELETE CASCADE deletes).
+                // NOTE: explicit column lists (not SELECT *) so legacy column
+                // order/count can never misalign the copy.
+                if let Err(e) = conn.execute_batch(
                     "PRAGMA foreign_keys = OFF;
                      BEGIN TRANSACTION;
 
                      CREATE TABLE candles_new (
-                         symbol          TEXT    NOT NULL,
-                         timeframe       TEXT    NOT NULL,
-                         timestamp       INTEGER NOT NULL,
-                         open            REAL    NOT NULL,
-                         high            REAL    NOT NULL,
-                         low             REAL    NOT NULL,
-                         close           REAL    NOT NULL,
-                         volume          INTEGER NOT NULL,
-                         PRIMARY KEY (symbol, timeframe, timestamp),
-                         FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
-                     ) WITHOUT ROWID;
+                          symbol          TEXT    NOT NULL,
+                          timeframe       TEXT    NOT NULL,
+                          timestamp       INTEGER NOT NULL,
+                          open            REAL    NOT NULL,
+                          high            REAL    NOT NULL,
+                          low             REAL    NOT NULL,
+                          close           REAL    NOT NULL,
+                          volume          INTEGER NOT NULL,
+                          PRIMARY KEY (symbol, timeframe, timestamp),
+                          FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+                      ) WITHOUT ROWID;
 
-                     INSERT INTO candles_new SELECT * FROM candles;
-                     DROP TABLE candles;
-                     ALTER TABLE candles_new RENAME TO candles;
-                     CREATE INDEX IF NOT EXISTS idx_candles_lookup 
-                     ON candles (symbol, timeframe, timestamp ASC);
+                      INSERT INTO candles_new (symbol, timeframe, timestamp, open, high, low, close, volume)
+                      SELECT symbol, timeframe, timestamp, open, high, low, close, volume FROM candles;
+                      DROP TABLE candles;
+                      ALTER TABLE candles_new RENAME TO candles;
+                      CREATE INDEX IF NOT EXISTS idx_candles_lookup 
+                      ON candles (symbol, timeframe, timestamp ASC);
 
-                     CREATE TABLE cache_sync_meta_new (
-                         symbol          TEXT    NOT NULL,
-                         timeframe       TEXT    NOT NULL,
-                         last_synced_at  INTEGER NOT NULL,
-                         first_candle_ts INTEGER NOT NULL,
-                         last_candle_ts  INTEGER NOT NULL,
-                         candle_count    INTEGER NOT NULL,
-                         last_verified_at INTEGER DEFAULT 0,
-                         is_gap_detected INTEGER DEFAULT 0,
-                         PRIMARY KEY (symbol, timeframe),
-                         FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
-                     );
+                      CREATE TABLE cache_sync_meta_new (
+                          symbol          TEXT    NOT NULL,
+                          timeframe       TEXT    NOT NULL,
+                          last_synced_at  INTEGER NOT NULL,
+                          first_candle_ts INTEGER NOT NULL,
+                          last_candle_ts  INTEGER NOT NULL,
+                          candle_count    INTEGER NOT NULL,
+                          last_verified_at INTEGER DEFAULT 0,
+                          is_gap_detected INTEGER DEFAULT 0,
+                          PRIMARY KEY (symbol, timeframe),
+                          FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+                      );
 
-                     INSERT INTO cache_sync_meta_new SELECT symbol, timeframe, last_synced_at, first_candle_ts, last_candle_ts, candle_count, 0, 0 FROM cache_sync_meta;
-                     DROP TABLE cache_sync_meta;
-                     ALTER TABLE cache_sync_meta_new RENAME TO cache_sync_meta;
+                      INSERT INTO cache_sync_meta_new SELECT symbol, timeframe, last_synced_at, first_candle_ts, last_candle_ts, candle_count, 0, 0 FROM cache_sync_meta;
+                      DROP TABLE cache_sync_meta;
+                      ALTER TABLE cache_sync_meta_new RENAME TO cache_sync_meta;
 
-                     COMMIT;
-                     PRAGMA foreign_keys = ON;",
-                )?;
+                      COMMIT;
+                      PRAGMA foreign_keys = ON;",
+                ) {
+                    let _ = conn.execute_batch("ROLLBACK; PRAGMA foreign_keys = ON;");
+                    return Err(e.into());
+                }
             } else {
                 // Table already has foreign keys. Ensure columns last_verified_at and is_gap_detected exist
                 let mut stmt = conn.prepare("PRAGMA table_info(cache_sync_meta)")?;
@@ -368,7 +400,10 @@ impl MarketDb {
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )?;
 
-        // Update metadata
+        // Update metadata.
+        // NOTE: is_gap_detected is deliberately preserved here, not cleared:
+        // intermediate saves inside a multi-gap backfill must not reset the
+        // flag; only the final detect_gaps pass (via mark_gap_detected) sets it.
         tx.execute(
             "INSERT INTO cache_sync_meta (symbol, timeframe, last_synced_at, first_candle_ts, last_candle_ts, candle_count, last_verified_at, is_gap_detected)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)
@@ -377,8 +412,7 @@ impl MarketDb {
                 first_candle_ts = excluded.first_candle_ts,
                 last_candle_ts = excluded.last_candle_ts,
                 candle_count = excluded.candle_count,
-                last_verified_at = excluded.last_verified_at,
-                is_gap_detected = 0",
+                last_verified_at = excluded.last_verified_at",
             params![symbol, timeframe, synced_at, first_ts, last_ts, count, synced_at],
         )?;
 
@@ -618,13 +652,15 @@ impl MarketDb {
         ttl_secs: i64,
     ) -> Result<bool, MarketError> {
         let meta = match self.get_sync_meta(symbol, timeframe)? {
-            Some(m) if m.candle_count > 0 => m,
+            // A stub with fewer than 2 candles cannot prove continuity:
+            // refetch instead of reporting fresh on a single candle.
+            Some(m) if m.candle_count >= 2 => m,
             _ => return Ok(false),
         };
 
         let tf: crate::domain::Timeframe = match timeframe.parse() {
             Ok(t) => t,
-            Err(_) => return Ok(false),
+            Err(e) => return Err(MarketError::InvalidTimeframe(e)),
         };
 
         if meta.is_gap_detected {
@@ -642,6 +678,11 @@ impl MarketDb {
         // If the latest expected candle is currently forming in live market:
         if expected.is_forming {
             let elapsed = chrono::Utc::now().timestamp() - meta.last_synced_at;
+            // A negative elapsed means the clock stepped back: never treat
+            // that as fresh, or stale data would look fresh indefinitely.
+            if elapsed < 0 {
+                return Ok(false);
+            }
             return Ok(elapsed <= ttl_secs);
         }
 

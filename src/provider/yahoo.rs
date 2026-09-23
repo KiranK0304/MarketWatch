@@ -17,6 +17,23 @@ pub struct YahooProvider {
     client: Client,
 }
 
+/// Validate a ticker symbol before interpolating it into a request URL.
+///
+/// Only Yahoo ticker characters are allowed; anything else (`?`, `&`, `#`,
+/// `/`, whitespace, …) would alter the request path/query.
+fn validate_symbol(symbol: &str) -> Result<(), MarketError> {
+    let ok = !symbol.is_empty()
+        && symbol.len() <= 32
+        && symbol
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '^' | '='));
+    if ok {
+        Ok(())
+    } else {
+        Err(MarketError::InvalidSymbol(symbol.to_string()))
+    }
+}
+
 impl YahooProvider {
     /// Create a new Yahoo provider with sensible defaults.
     pub fn new() -> Result<Self, MarketError> {
@@ -31,6 +48,7 @@ impl YahooProvider {
 
     /// Fetch latest market quote and price change for a stock mover.
     pub async fn fetch_mover(&self, symbol: &str, name: &str) -> Result<StockMover, MarketError> {
+        validate_symbol(symbol)?;
         let endpoints = [
             format!(
                 "https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
@@ -70,8 +88,15 @@ impl YahooProvider {
                 }
             };
 
-            let yahoo_response: YahooChartResponse = serde_json::from_str(&body)
-                .map_err(|e| MarketError::Parse(format!("Yahoo JSON parse error: {e}")))?;
+            let yahoo_response: YahooChartResponse = match serde_json::from_str(&body) {
+                Ok(r) => r,
+                Err(e) => {
+                    // A truncated/garbage 200 body from query2 should still
+                    // fall through to query1 instead of aborting the loop.
+                    last_error = Some(MarketError::Parse(format!("Yahoo JSON parse error: {e}")));
+                    continue;
+                }
+            };
 
             return convert_to_mover(&yahoo_response, symbol, name);
         }
@@ -90,12 +115,32 @@ impl YahooProvider {
         period1: i64,
         period2: i64,
     ) -> Result<Vec<Candle>, MarketError> {
+        validate_symbol(symbol)?;
+        if period2 < period1 {
+            return Err(MarketError::InvalidInput(format!(
+                "Invalid range for '{symbol}': period2 ({period2}) < period1 ({period1})"
+            )));
+        }
         let now_epoch = chrono::Utc::now().timestamp();
         let clamped_period1 = match timeframe {
             Timeframe::Min5 | Timeframe::Min15 => period1.max(now_epoch - 59 * 86400),
             Timeframe::Min30 | Timeframe::Hour1 => period1.max(now_epoch - 720 * 86400),
             Timeframe::Day1 | Timeframe::Week1 => period1,
         };
+        if clamped_period1 != period1 {
+            // Surface the truncation: callers (gap recovery) treat a short
+            // response as a filled gap, so history older than the clamp would
+            // otherwise be lost without any signal.
+            eprintln!(
+                "Warning: Yahoo only serves ~{} of history for {timeframe}; requested start {} truncated to {} for '{symbol}'",
+                match timeframe {
+                    Timeframe::Min5 | Timeframe::Min15 => "59 days",
+                    _ => "720 days",
+                },
+                period1,
+                clamped_period1,
+            );
+        }
         let clamped_period2 = period2.max(clamped_period1 + 60);
 
         let p1_str = clamped_period1.to_string();
@@ -116,6 +161,7 @@ impl YahooProvider {
         timeframe: Timeframe,
         query_params: &[(&str, &str)],
     ) -> Result<Vec<Candle>, MarketError> {
+        validate_symbol(symbol)?;
         let endpoints = [
             format!("https://query2.finance.yahoo.com/v8/finance/chart/{symbol}"),
             format!("https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"),
@@ -151,8 +197,13 @@ impl YahooProvider {
                 }
             };
 
-            let yahoo_response: YahooChartResponse = serde_json::from_str(&body)
-                .map_err(|e| MarketError::Parse(format!("Yahoo JSON parse error: {e}")))?;
+            let yahoo_response: YahooChartResponse = match serde_json::from_str(&body) {
+                Ok(r) => r,
+                Err(e) => {
+                    last_error = Some(MarketError::Parse(format!("Yahoo JSON parse error: {e}")));
+                    continue;
+                }
+            };
 
             return convert_to_candles_aligned(&yahoo_response, symbol, Some(timeframe));
         }
@@ -304,6 +355,9 @@ fn convert_to_candles_aligned(
 
     let mut candles = Vec::with_capacity(len);
 
+    // Null volume is common on forming/pre-market ticks: keep the price candle
+    // with volume 0 instead of discarding it (which created artificial gaps).
+    // Null OHLC still discards the entry.
     let iter = timestamps
         .iter()
         .zip(&quote.open)
@@ -311,15 +365,25 @@ fn convert_to_candles_aligned(
         .zip(&quote.low)
         .zip(&quote.close)
         .zip(&quote.volume)
-        .filter_map(|(((((ts, o), h), l), c), v)| Some((*ts, (*o)?, (*h)?, (*l)?, (*c)?, (*v)?)));
+        .filter_map(|(((((ts, o), h), l), c), v)| {
+            Some((*ts, (*o)?, (*h)?, (*l)?, (*c)?, v.unwrap_or(0)))
+        });
 
     for (raw_ts, open, high, low, close, volume) in iter {
+        if raw_ts <= 0 {
+            continue;
+        }
         let ts = if let Some(tf) = timeframe {
             crate::domain::calendar::MarketCalendar::align_timestamp(raw_ts, tf)
         } else {
             raw_ts
         };
-        let datetime = DateTime::from_timestamp(ts, 0).unwrap_or_default();
+        // Never let an out-of-range network timestamp become a 1970 epoch
+        // candle and poison first_candle_ts / gap detection.
+        let datetime = match DateTime::from_timestamp(ts, 0) {
+            Some(d) => d,
+            None => continue,
+        };
 
         candles.push(Candle {
             timestamp: ts,
@@ -346,7 +410,7 @@ fn convert_to_candles_aligned(
             last.high = last.high.max(c.high);
             last.low = last.low.min(c.low);
             last.close = c.close;
-            last.volume = c.volume;
+            last.volume = last.volume.saturating_add(c.volume);
             continue;
         }
         deduped.push(c);
@@ -405,19 +469,37 @@ fn convert_to_mover(
             } else {
                 None
             }
-        })
-        .unwrap_or(price);
+        });
+
+    let meta_change_percent = meta.and_then(|m| m.regular_market_change_percent);
+
+    // Keep price/prev_close/change_percent internally consistent:
+    // - if prev_close is missing but Yahoo gave a percent, back it out;
+    // - if both are missing, there is no usable quote (NoData) rather than a
+    //   synthetic flat 0% mover that scanners silently ignore.
+    let (prev_close, change_percent) = match (prev_close, meta_change_percent) {
+        (Some(pc), _) if pc.abs() > 0.0001 => {
+            let change = price - pc;
+            let pct = meta_change_percent.unwrap_or((change / pc) * 100.0);
+            (pc, pct)
+        }
+        (Some(pc), _) => (pc, meta_change_percent.unwrap_or(0.0)),
+        (None, Some(pct)) => {
+            let pc = if (100.0 + pct).abs() > 0.0001 {
+                price / (1.0 + pct / 100.0)
+            } else {
+                price
+            };
+            (pc, pct)
+        }
+        (None, None) => {
+            return Err(MarketError::NoData {
+                symbol: symbol.to_string(),
+            });
+        }
+    };
 
     let change = price - prev_close;
-    let change_percent = meta
-        .and_then(|m| m.regular_market_change_percent)
-        .unwrap_or_else(|| {
-            if prev_close.abs() > 0.0001 {
-                (change / prev_close) * 100.0
-            } else {
-                0.0
-            }
-        });
 
     let volume = meta
         .and_then(|m| m.regular_market_volume)
