@@ -62,15 +62,19 @@ flowchart TD
   * **Top 150 Watchlist & Screener**: Live search, category badges, top movers filtering (gainers/losers by 1%, 2%, 3%, 5% threshold).
   * **Multi-Chart Grid Mode**: View mini-charts for all market movers simultaneously.
 
-### B. Storage & Caching Layer (`src/storage/` & `src/provider/cached.rs`)
-* **`MarketDb`**: Embedded SQLite wrapper managing connection pooling with WAL mode and transaction-safe upserts.
-* **`CachedProvider`**: Decorator pattern wrapping any `MarketDataProvider`. Implements market-aware cache validation:
-  * **Market Closed**: Never queries Yahoo Finance if data was synced after the latest 15:30 IST market close.
-  * **Market Open**: Enforces a 60-second freshness TTL to prevent redundant network calls during active chart browsing.
-  * **Offline Resilience**: Gracefully serves stored historical candles if network drops or API rate-limits.
+### B. Storage & Caching Layer (`src/storage/`, `src/domain/calendar.rs`, & `src/provider/sync.rs`)
+* **`MarketDb`**: Embedded SQLite wrapper managing connection pooling with WAL mode, foreign key cascade deletes, and transaction-safe upserts. Tracks `cache_sync_meta` and internal session gap detection.
+* **`MarketCalendar`**: High-precision Indian stock market (NSE/BSE) trading schedule and holiday master. Manages IST conversions (`+05:30`), weekend detection, official holiday validation (2024–2027), session slot generators (e.g. 25 daily 15m slots), and boundary alignment flooring.
+* **`CandleSyncService`**: Unified coordinator for both Web API and Native Desktop GUI callers:
+  * **In-Flight Concurrency Coalescing**: Uses `tokio::sync::watch` channels to ensure multiple simultaneous requests for the exact same `(symbol, timeframe)` pair trigger exactly one upstream Yahoo Finance fetch; all other callers wait and read the committed result.
+  * **Gap-Aware Incremental Sync**: Determines missing ranges, querying Yahoo with targeted `period1`/`period2` bounds clamped to provider lookback limits (e.g., 59 days for 5m/15m).
+  * **Intra-Response Slot Flooring**: Floores floating seconds (e.g. `11:36:42` -> `11:30:00`) and resolves same-slot candle updates in-place without generating duplicate database records.
+  * **Graceful Degradation**: Serves cached historical candles (`X-Cache: STALE-FALLBACK`) when upstream networks fail, while returning explicit errors if the cache is empty.
+* **`CachedProvider`**: Native desktop UI adapter delegating directly to `CandleSyncService`.
 
 ### C. Market Data Provider (`src/provider/yahoo.rs`)
 * Handles raw HTTP communication with Yahoo Finance chart APIs (`query2` / `query1`).
+* Supports both standard range queries and incremental `period1`/`period2` window requests with lookback clamping.
 * Translates raw JSON into application domain [`Candle`](file:///home/kiran/work/Rust/MarketWatch/src/domain/candle.rs) and [`StockMover`](file:///home/kiran/work/Rust/MarketWatch/src/domain/mover.rs) structs.
 
 ### D. Automated Scheduler & Service (`src/scanner/`)

@@ -90,12 +90,14 @@ Stores synchronization state per `(symbol, timeframe)` pair, linked via foreign 
 
 ```sql
 CREATE TABLE IF NOT EXISTS cache_sync_meta (
-    symbol          TEXT    NOT NULL,
-    timeframe       TEXT    NOT NULL,
-    last_synced_at  INTEGER NOT NULL,
-    first_candle_ts INTEGER NOT NULL,
-    last_candle_ts  INTEGER NOT NULL,
-    candle_count    INTEGER NOT NULL,
+    symbol           TEXT    NOT NULL,
+    timeframe        TEXT    NOT NULL,
+    last_synced_at   INTEGER NOT NULL,
+    first_candle_ts  INTEGER NOT NULL,
+    last_candle_ts   INTEGER NOT NULL,
+    candle_count     INTEGER NOT NULL,
+    last_verified_at INTEGER DEFAULT 0,
+    is_gap_detected  INTEGER DEFAULT 0,
     PRIMARY KEY (symbol, timeframe),
     FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
 );
@@ -106,39 +108,69 @@ CREATE TABLE IF NOT EXISTS cache_sync_meta (
 | Column | Type | Nullable | Description |
 | :--- | :--- | :--- | :--- |
 | `symbol` | TEXT | NO | NSE stock symbol referencing `tickers(symbol)` (Foreign Key, `ON DELETE CASCADE`) |
-| `timeframe` | TEXT | NO | Timeframe code (e.g. `'15m'`) |
+| `timeframe` | TEXT | NO | Timeframe code (e.g. `'15m'`, `'1d'`) |
 | `last_synced_at` | INTEGER | NO | Unix epoch timestamp of when Yahoo Finance API was last queried |
 | `first_candle_ts` | INTEGER | NO | Timestamp of earliest stored candle for this symbol & timeframe |
 | `last_candle_ts` | INTEGER | NO | Timestamp of latest stored candle for this symbol & timeframe |
 | `candle_count` | INTEGER | NO | Total number of candles stored in the `candles` table |
+| `last_verified_at`| INTEGER | YES | Unix epoch timestamp of when internal gaps were last verified |
+| `is_gap_detected` | INTEGER | YES | Flag (`1` or `0`) indicating whether missing historical session slots exist |
 
 ---
 
-## Cache Freshness & Validation Algorithm
+### 4. `market_holidays` (Exchange Calendar & Holiday Overrides)
 
-When a request for candles is received (`/api/candles?symbol=XYZ&timeframe=15m`), the system executes the following market-aware validation:
+Stores official Indian stock exchange (NSE/BSE) trading holidays and operational overrides.
+
+```sql
+CREATE TABLE IF NOT EXISTS market_holidays (
+    holiday_date TEXT PRIMARY KEY NOT NULL,
+    description  TEXT NOT NULL,
+    exchange     TEXT NOT NULL DEFAULT 'NSE'
+);
+```
+
+#### Columns
+
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `holiday_date` | TEXT | NO | Date in `YYYY-MM-DD` format (Primary Key) |
+| `description`  | TEXT | NO | Name of the holiday (e.g. `'Diwali-Laxmi Pujan'`, `'Independence Day'`) |
+| `exchange`     | TEXT | NO | Exchange identifier (defaults to `'NSE'`) |
+
+---
+
+## Gap-Aware Incremental Cache Architecture
+
+When candles are requested via the Web API or Native GUI, [`CandleSyncService`](file:///home/kiran/work/Rust/MarketWatch/src/provider/sync.rs) executes the gap-aware synchronization lifecycle:
 
 ```mermaid
 flowchart TD
-    Req["Request (symbol, timeframe, force)"] --> Force{"Is force == true?"}
-    Force -- "Yes (Refresh clicked)" --> Fetch["Fetch from Yahoo Finance API"]
-    Force -- "No" --> CheckMeta{"Query cache_sync_meta"}
+    Req["Request (symbol, timeframe, force)"] --> CheckInFlight{"In-Flight Request<br/>Already Running for Key?"}
     
-    CheckMeta -- "No record or count == 0" --> Fetch
-    CheckMeta -- "Record exists" --> MarketStatus{"Is Indian Market Open?<br/>(Mon-Fri, 09:15 - 15:30 IST)"}
+    CheckInFlight -- "Yes (Concurrent)" --> Subscribe["Subscribe to watch channel<br/>(Wait for primary task)"]
+    Subscribe --> ReadCoalesced["Read SQLite DB directly<br/>(Return X-Cache: COALESCED-HIT)"]
+
+    CheckInFlight -- "No (Primary)" --> Register["Register in-flight sender"]
+    Register --> CheckFresh{"Is Cache Fresh & Gap-Free?<br/>(!force && is_fresh && detect_gaps empty)"}
     
-    MarketStatus -- "Yes (Market Open)" --> CheckTTL{"(now - last_synced_at) <= 60s ?"}
-    CheckTTL -- "Yes (Fresh)" --> ReadDB["Read from SQLite DB (< 1ms)"]
-    CheckTTL -- "No (Stale)" --> Fetch
+    CheckFresh -- "Yes" --> ReadHit["Read from SQLite DB<br/>(Return X-Cache: HIT)"]
     
-    MarketStatus -- "No (Market Closed / Weekend)" --> CheckClose{"last_synced_at >= Most Recent 15:30 IST Close?"}
-    CheckClose -- "Yes (Data is Final)" --> ReadDB
-    CheckClose -- "No" --> Fetch
+    CheckFresh -- "No (Gap or Stale)" --> CheckMeta{"Stored Candles Exist?"}
     
-    Fetch --> Upsert["Upsert candles into SQLite (INSERT ... ON CONFLICT)"]
-    Upsert --> UpdateMeta["Update cache_sync_meta"]
-    UpdateMeta --> ReturnData["Return combined history from SQLite"]
-    ReadDB --> ReturnData
+    CheckMeta -- "Yes (Incremental)" --> RangeQuery["Fetch Missing Range Only<br/>period1 = max(last_candle_ts, 59-day clamp)<br/>period2 = now()"]
+    CheckMeta -- "No (Initial/Force)" --> FullQuery["Fetch Full Timeframe Window"]
+    
+    RangeQuery --> ExecFetch["Execute Yahoo Request"]
+    FullQuery --> ExecFetch
+    
+    ExecFetch -- "Success" --> AlignFloor["Align tick seconds to session slot boundaries<br/>Deduplicate same-slot updates"]
+    AlignFloor --> Upsert["Upsert to SQLite<br/>INSERT ... ON CONFLICT DO UPDATE"]
+    Upsert --> Broadcast["Notify coalesced subscribers & return MISS"]
+    
+    ExecFetch -- "Network Error" --> Fallback{"Stored DB Cache Exists?"}
+    Fallback -- "Yes" --> StaleReturn["Return cached candles<br/>(Return X-Cache: STALE-FALLBACK)"]
+    Fallback -- "No" --> ErrorReturn["Return 502 Bad Gateway / Network Error"]
 ```
 
 ### Network Fallback
