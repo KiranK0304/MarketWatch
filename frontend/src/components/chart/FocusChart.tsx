@@ -140,6 +140,13 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
 
   // 2. Fetch candle data when activeStock, timeframe, or forceRefresh changes
   useEffect(() => {
+    setCandleData([]);
+    setCandles([]);
+    setLatestCandleInfo(0, null);
+    onPriceUpdate?.('₹--', { text: '--', isPositive: true });
+    candleSeriesRef.current?.setData([]);
+    volumeSeriesRef.current?.setData([]);
+
     if (!activeStock || !candleSeriesRef.current || !volumeSeriesRef.current) return;
 
     let isSubscribed = true;
