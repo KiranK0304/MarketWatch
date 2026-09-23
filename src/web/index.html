@@ -2769,8 +2769,20 @@
 
     // Chart Note Indicators (x-axis dots)
     let currentStockNotes = [];
+    let noteMarkerGen = 0;
+    let noteRangeSubscription = null;
+
+    function canonicalTimeframe(value) {
+      const normalized = String(value || '').toLowerCase();
+      return normalized === '60m' ? '1h' : normalized === '1wk' ? '1w' : normalized;
+    }
 
     async function updateChartNoteMarkers(symbol) {
+      const markerGen = ++noteMarkerGen;
+      if (noteRangeSubscription && chart) {
+        chart.timeScale().unsubscribeVisibleTimeRangeChange(noteRangeSubscription);
+        noteRangeSubscription = null;
+      }
       const strip = document.getElementById('note-indicator-strip');
       if (strip) strip.innerHTML = '';
 
@@ -2785,19 +2797,23 @@
         const res = await fetch(`/api/notes?symbol=${encodeURIComponent(symbol)}`);
         if (!res.ok) return;
         const notes = await res.json();
+        if (markerGen !== noteMarkerGen) return;
         currentStockNotes = notes;
 
         if (!strip || notes.length === 0) return;
 
         const timeScale = chart.timeScale();
-        const minChartTime = candleData[0].timestamp;
-        const maxChartTime = candleData[candleData.length - 1].timestamp;
-        const candleInterval = candleData.length > 1
-          ? (candleData[1].timestamp - candleData[0].timestamp)
+        const visibleCandles = candleData.slice();
+        const activeTimeframe = canonicalTimeframe(currentTimeframe);
+        const timeframeNotes = notes.filter(n => canonicalTimeframe(n.timeframe) === activeTimeframe);
+        const minChartTime = visibleCandles[0].timestamp;
+        const maxChartTime = visibleCandles[visibleCandles.length - 1].timestamp;
+        const candleInterval = visibleCandles.length > 1
+          ? Math.max(1, visibleCandles[1].timestamp - visibleCandles[0].timestamp)
           : 900;
 
         // Filter notes within chart time range (allowing 1 candle buffer on either side)
-        const visibleNotes = notes.filter(n => {
+        const visibleNotes = timeframeNotes.filter(n => {
           const ts = n.candle_timestamp || n.created_at;
           return ts && ts >= (minChartTime - candleInterval) && ts <= (maxChartTime + candleInterval);
         });
@@ -2806,13 +2822,13 @@
           const ts = note.candle_timestamp || note.created_at;
 
           // Snap to nearest candle within reasonable tolerance
-          let snapTs = candleData[0].timestamp;
-          let minDiff = Math.abs(candleData[0].timestamp - ts);
-          for (let i = 1; i < candleData.length; i++) {
-            const diff = Math.abs(candleData[i].timestamp - ts);
+          let snapTs = visibleCandles[0].timestamp;
+          let minDiff = Math.abs(visibleCandles[0].timestamp - ts);
+          for (let i = 1; i < visibleCandles.length; i++) {
+            const diff = Math.abs(visibleCandles[i].timestamp - ts);
             if (diff < minDiff) {
               minDiff = diff;
-              snapTs = candleData[i].timestamp;
+              snapTs = visibleCandles[i].timestamp;
             }
           }
 
@@ -2847,11 +2863,11 @@
             if (!note) return;
             const ts = note.candle_timestamp || note.created_at;
 
-            let snapTs = candleData[0].timestamp;
-            let minD = Math.abs(candleData[0].timestamp - ts);
-            for (let i = 1; i < candleData.length; i++) {
-              const d = Math.abs(candleData[i].timestamp - ts);
-              if (d < minD) { minD = d; snapTs = candleData[i].timestamp; }
+            let snapTs = visibleCandles[0].timestamp;
+            let minD = Math.abs(visibleCandles[0].timestamp - ts);
+            for (let i = 1; i < visibleCandles.length; i++) {
+              const d = Math.abs(visibleCandles[i].timestamp - ts);
+              if (d < minD) { minD = d; snapTs = visibleCandles[i].timestamp; }
             }
 
             const x = timeScale.timeToCoordinate(snapTs);
@@ -2864,7 +2880,8 @@
           });
         };
 
-        timeScale.subscribeVisibleTimeRangeChange(repositionDots);
+        noteRangeSubscription = repositionDots;
+        timeScale.subscribeVisibleTimeRangeChange(noteRangeSubscription);
       } catch (e) {
         console.warn('Failed to load chart note indicators', e);
       }
