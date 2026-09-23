@@ -273,6 +273,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         showToast(`Removed ${symbol}`);
         const nextList = stocks.filter(s => s.symbol !== symbol);
         setStocks(nextList);
+        setMovers(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            gainers: prev.gainers.filter(m => m.symbol !== symbol),
+            losers: prev.losers.filter(m => m.symbol !== symbol),
+          };
+        });
         setCurrentIndex(prev => Math.min(prev, Math.max(0, nextList.length - 1)));
       } catch (err: any) {
         showToast(`Error: ${err.message}`);
