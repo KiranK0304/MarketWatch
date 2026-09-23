@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useApp } from './context/AppContext';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { LeftRail } from './components/layout/LeftRail';
@@ -21,10 +21,10 @@ export const App: React.FC = () => {
   const [heroPrice, setHeroPrice] = useState('₹--');
   const [heroChange, setHeroChange] = useState({ text: '--', isPositive: true });
 
-  const handlePriceUpdate = (price: string, change: { text: string; isPositive: boolean }) => {
+  const handlePriceUpdate = useCallback((price: string, change: { text: string; isPositive: boolean }) => {
     setHeroPrice(price);
     setHeroChange(change);
-  };
+  }, []);
 
   return (
     <>
