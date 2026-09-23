@@ -27,6 +27,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const consumedForceRefreshRef = useRef(0);
+  const updateDotsPositionRef = useRef<() => void>(() => {});
 
   const [candleData, setCandleData] = useState<Candle[]>([]);
   const [ohlc, setOhlc] = useState({
@@ -105,7 +106,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
       const volData = param.seriesData.get(volumeSeries) as HistogramData | undefined;
 
       if (data) {
-        const chg = ((data.close - data.open) / data.open) * 100;
+        const chg = data.open > 0 ? ((data.close - data.open) / data.open) * 100 : 0;
         const volStr = volData?.value ? (volData.value > 1e6 ? `${(volData.value / 1e6).toFixed(2)}M` : `${(volData.value / 1e3).toFixed(0)}K`) : '--';
 
         setOhlc({
@@ -125,6 +126,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         chart.resize(width, height);
+        updateDotsPositionRef.current();
       }
     });
     ro.observe(containerRef.current);
@@ -192,7 +194,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
           const last = candles[candles.length - 1];
           setLatestCandleInfo(last.close, last.timestamp);
           const first = candles[0];
-          const totalChg = ((last.close - first.open) / first.open) * 100;
+          const totalChg = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : 0;
           const isPos = totalChg >= 0;
 
           if (onPriceUpdate) {
@@ -218,6 +220,8 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
 
   // 3. Fetch Stock Notes and position x-axis indicator dots
   useEffect(() => {
+    setNotes([]);
+    setDots([]);
     if (!activeStock) return;
     let isSubscribed = true;
 
@@ -234,7 +238,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     return () => {
       isSubscribed = false;
     };
-  }, [activeStock, forceRefreshCounter]);
+  }, [activeStock?.symbol, forceRefreshCounter]);
 
   // Canonicalize timeframe string for matching
   const canonicalTimeframe = (tf: string) => {
@@ -299,6 +303,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
 
   // Subscribe to timeScale changes
   useEffect(() => {
+    updateDotsPositionRef.current = updateDotsPosition;
     const chart = chartRef.current;
     if (!chart) return;
 
@@ -309,6 +314,14 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
       chart.timeScale().unsubscribeVisibleTimeRangeChange(updateDotsPosition);
     };
   }, [updateDotsPosition]);
+
+  // Re-sync dots when drawer toggles (CSS transition width)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateDotsPosition();
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [isDrawerOpen, updateDotsPosition]);
 
   // Handle dot click: open journal drawer & scroll to note
   const handleDotClick = (noteId: number) => {

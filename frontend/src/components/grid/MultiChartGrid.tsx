@@ -70,7 +70,7 @@ const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
 
         const last = candles[candles.length - 1];
         const first = candles[0];
-        const chg = ((last.close - first.open) / first.open) * 100;
+        const chg = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : 0;
         const isPos = chg >= 0;
 
         setPriceInfo({

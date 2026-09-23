@@ -58,12 +58,15 @@ export const JournalTab: React.FC = () => {
   const jumpToNote = async (refId: number) => {
     try {
       const refNote = await api.getNote(refId);
-      if (refNote.symbol !== activeStock?.symbol && journalFilterScope === 'stock') {
+      if (refNote.symbol && refNote.symbol !== activeStock?.symbol) {
         selectStock(refNote.symbol);
       }
-      setTimeout(() => {
+      let attempts = 0;
+      const highlightInterval = setInterval(() => {
+        attempts++;
         const card = document.getElementById(`note-card-${refId}`);
         if (card) {
+          clearInterval(highlightInterval);
           card.scrollIntoView({ behavior: 'smooth', block: 'center' });
           card.style.outline = '2px solid var(--accent)';
           card.style.outlineOffset = '2px';
@@ -71,8 +74,10 @@ export const JournalTab: React.FC = () => {
             card.style.outline = '';
             card.style.outlineOffset = '';
           }, 2500);
+        } else if (attempts > 15) {
+          clearInterval(highlightInterval);
         }
-      }, 350);
+      }, 100);
     } catch (err: any) {
       showToast(`Could not navigate to referenced note: ${err.message}`);
     }

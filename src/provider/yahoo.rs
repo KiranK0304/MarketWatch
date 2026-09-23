@@ -141,6 +141,9 @@ impl YahooProvider {
                 clamped_period1,
             );
         }
+        if period2 < clamped_period1 {
+            return Ok(Vec::new());
+        }
         let clamped_period2 = period2.max(clamped_period1 + 60);
 
         let p1_str = clamped_period1.to_string();
@@ -706,5 +709,19 @@ mod tests {
         assert!((mover.change_percent - 4.166).abs() < 0.001);
         assert!(mover.matches_threshold(3.0));
         assert!(mover.is_gainer());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_candles_range_older_than_limit() {
+        let provider = YahooProvider::new().unwrap();
+        let now = chrono::Utc::now().timestamp();
+        // Request 5m data from 90 days ago to 80 days ago (Yahoo only serves 59 days)
+        let period1 = now - 90 * 86400;
+        let period2 = now - 80 * 86400;
+        let result = provider
+            .fetch_candles_range("RELIANCE.NS", Timeframe::Min5, period1, period2)
+            .await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
     }
 }
