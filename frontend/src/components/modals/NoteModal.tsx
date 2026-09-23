@@ -28,6 +28,7 @@ export const NoteModal: React.FC = () => {
   // Initialize form when opening or editingNote changes
   useEffect(() => {
     if (!isNoteModalOpen) return;
+    let isSubscribed = true;
 
     if (editingNote) {
       setTitle(editingNote.title);
@@ -49,11 +50,16 @@ export const NoteModal: React.FC = () => {
     const sym = editingNote ? editingNote.symbol : activeStock?.symbol;
     if (sym) {
       api.getNotes(sym).then(notes => {
+        if (!isSubscribed) return;
         // Exclude current note from references
         const filtered = editingNote ? notes.filter(n => n.id !== editingNote.id) : notes;
         setAvailableNotes(filtered);
       });
     }
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [isNoteModalOpen, editingNote, activeStock]);
 
   if (!isNoteModalOpen) return null;
