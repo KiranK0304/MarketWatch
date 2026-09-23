@@ -107,7 +107,7 @@ async fn add_stock(
     State(state): State<WebState>,
     Json(new_stock): Json<StockEntry>,
 ) -> Result<Json<StockEntry>, (StatusCode, Json<ErrorResponse>)> {
-    let mut config = config::load_stock_config(&state.config_path).map_err(|e| {
+    let original_config = config::load_stock_config(&state.config_path).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -115,6 +115,7 @@ async fn add_stock(
             }),
         )
     })?;
+    let mut config = original_config.clone();
 
     let sym_upper = new_stock.symbol.trim().to_uppercase();
     if sym_upper.is_empty() {
@@ -163,13 +164,27 @@ async fn add_stock(
         )
     })?;
 
-    let _ = state.db.upsert_ticker(&crate::storage::Ticker {
+    if let Err(e) = state.db.upsert_ticker(&crate::storage::Ticker {
         symbol: added.symbol.clone(),
         name: added.name.clone(),
         exchange: "NSE".to_string(),
         is_active: true,
         created_at: chrono::Utc::now().timestamp(),
-    });
+    }) {
+        let rollback = config::save_stock_config(&state.config_path, &original_config);
+        let message = match rollback {
+            Ok(()) => format!("Failed to update ticker database: {e}"),
+            Err(rollback_error) => {
+                format!(
+                    "Failed to update ticker database: {e}; config rollback also failed: {rollback_error}"
+                )
+            }
+        };
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: message }),
+        ));
+    }
 
     Ok(Json(added))
 }
@@ -179,7 +194,7 @@ async fn delete_stock(
     State(state): State<WebState>,
     Path(symbol): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
-    let mut config = config::load_stock_config(&state.config_path).map_err(|e| {
+    let original_config = config::load_stock_config(&state.config_path).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -187,6 +202,7 @@ async fn delete_stock(
             }),
         )
     })?;
+    let mut config = original_config.clone();
 
     let sym_upper = symbol.trim().to_uppercase();
     let initial_len = config.stocks.len();
@@ -221,7 +237,21 @@ async fn delete_stock(
         )
     })?;
 
-    let _ = state.db.delete_ticker(&sym_upper);
+    if let Err(e) = state.db.delete_ticker(&sym_upper) {
+        let rollback = config::save_stock_config(&state.config_path, &original_config);
+        let message = match rollback {
+            Ok(()) => format!("Failed to delete ticker database record: {e}"),
+            Err(rollback_error) => {
+                format!(
+                    "Failed to delete ticker database record: {e}; config rollback also failed: {rollback_error}"
+                )
+            }
+        };
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: message }),
+        ));
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -583,9 +613,8 @@ pub async fn start_server(
 ) -> anyhow::Result<()> {
     let provider = Arc::new(YahooProvider::new()?);
     let db = MarketDb::open_default()?;
-    if let Ok(cfg) = config::load_stock_config(&config_path) {
-        let _ = db.sync_tickers(&cfg.stocks);
-    }
+    let cfg = config::load_stock_config(&config_path)?;
+    db.sync_tickers(&cfg.stocks)?;
     let sync_service = CandleSyncService::new(db.clone(), provider.clone());
     let state = WebState {
         config_path,

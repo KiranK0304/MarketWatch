@@ -31,7 +31,7 @@ pub async fn run(timeframe: Timeframe, symbol_arg: Option<&str>) -> anyhow::Resu
 
     // Fetch market data with SQLite caching
     let db = crate::storage::MarketDb::open_default()?;
-    let _ = db.sync_tickers(&stock_config.stocks);
+    db.sync_tickers(&stock_config.stocks)?;
     let provider = crate::provider::CachedProvider::new(YahooProvider::new()?, db);
     let candles = provider.fetch_candles(&stock.symbol, timeframe).await?;
     println!(
