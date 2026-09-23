@@ -718,8 +718,49 @@
       height: 100%;
       overflow-y: auto;
       padding: 16px;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .grid-toolbar-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: -16px;
+      background: var(--bg-app);
+      z-index: 10;
+    }
+
+    #grid-cards-box {
+      display: grid;
       grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
       gap: 14px;
+      width: 100%;
+    }
+
+    .grid-psize-btn {
+      padding: 2px 7px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .grid-psize-btn:hover {
+      color: var(--text-main);
+      border-color: var(--text-muted);
+    }
+    .grid-psize-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
     }
 
     .grid-chart-card {
@@ -1383,6 +1424,10 @@
     let candleSeries = null;
     let volumeSeries = null;
     let gridChartInstances = [];
+    let gridScope = 'universe'; // 'universe' | 'movers'
+    let gridSearchQuery = '';
+    let gridCurrentPage = 1;
+    let gridPageSize = 24;
 
     // Elements
     const sidebar = document.getElementById('sidebar');
@@ -1867,7 +1912,9 @@
         fetchChartData();
       } else {
         chartBox.style.display = 'none';
-        gridBox.style.display = 'grid';
+        gridBox.style.display = 'flex';
+        gridScope = currentTab === 'movers' ? 'movers' : 'universe';
+        gridCurrentPage = 1;
         renderMultiChartGrid();
       }
     }
@@ -1877,48 +1924,215 @@
       gridChartInstances = [];
       gridBox.innerHTML = '';
 
-      const list = getFilteredMovers();
-      if (list.length === 0) {
-        gridBox.innerHTML = `
-          <div style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-muted); gap: 12px;">
-            <div style="font-size: 15px; font-weight: 600;">No movers beyond ±${currentThreshold}%</div>
-            <div style="font-size: 12px;">Adjust threshold or click Refresh Scan.</div>
+      // Determine base list based on gridScope
+      let baseList = [];
+      if (gridScope === 'movers') {
+        const movers = getFilteredMovers();
+        baseList = movers.map(m => ({
+          symbol: m.symbol,
+          name: m.name,
+          price: m.price,
+          change_percent: m.change_percent,
+        }));
+      } else {
+        baseList = stocks.map(s => {
+          const mover = (moversData && moversData.movers) ? moversData.movers.find(m => m.symbol === s.symbol) : null;
+          return {
+            symbol: s.symbol,
+            name: s.name,
+            price: mover ? mover.price : null,
+            change_percent: mover ? mover.change_percent : null,
+          };
+        });
+      }
+
+      // Filter by search query
+      const q = gridSearchQuery.trim().toLowerCase();
+      const filteredList = q
+        ? baseList.filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+        : baseList;
+
+      // Update Top Hero Bar for Grid mode
+      const heroSym = document.getElementById('hero-sym');
+      const heroPrice = document.getElementById('hero-price');
+      const heroChg = document.getElementById('hero-chg');
+      if (heroSym) heroSym.textContent = gridScope === 'universe' ? 'ALL UNIVERSE GRID' : 'TOP MOVERS GRID';
+      if (heroPrice) heroPrice.textContent = `${filteredList.length} STOCKS`;
+      if (heroChg) {
+        heroChg.textContent = currentTimeframe;
+        heroChg.style.color = 'var(--accent)';
+      }
+
+      // Pagination math
+      const isAll = gridPageSize >= 1000;
+      const totalPages = isAll ? 1 : (Math.ceil(filteredList.length / gridPageSize) || 1);
+      if (gridCurrentPage > totalPages) gridCurrentPage = totalPages;
+      if (gridCurrentPage < 1) gridCurrentPage = 1;
+
+      const startIdx = isAll ? 0 : (gridCurrentPage - 1) * gridPageSize;
+      const endIdx = isAll ? filteredList.length : Math.min(startIdx + gridPageSize, filteredList.length);
+      const pageItems = filteredList.slice(startIdx, endIdx);
+
+      // Create toolbar header
+      const toolbar = document.createElement('div');
+      toolbar.className = 'grid-toolbar-header';
+      toolbar.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; background: var(--bg-surface); padding: 2px; border-radius: 6px; border: 1px solid var(--border);">
+            <button class="grid-scope-tab ${gridScope === 'universe' ? 'active' : ''}" data-scope="universe" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: ${gridScope === 'universe' ? 'var(--accent)' : 'transparent'}; color: ${gridScope === 'universe' ? '#fff' : 'var(--text-muted)'};">
+              All Universe (${stocks.length})
+            </button>
+            <button class="grid-scope-tab ${gridScope === 'movers' ? 'active' : ''}" data-scope="movers" style="padding: 4px 10px; font-size: 12px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: ${gridScope === 'movers' ? 'var(--accent)' : 'transparent'}; color: ${gridScope === 'movers' ? '#fff' : 'var(--text-muted)'};">
+              Top Movers (${getFilteredMovers().length})
+            </button>
           </div>
+
+          <div style="position: relative; display: flex; align-items: center;">
+            <input type="text" id="grid-search-input" placeholder="Filter grid..." value="${escapeHtml(gridSearchQuery)}" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 24px 5px 8px; font-size: 12px; color: var(--text-main); font-family: var(--font-mono); width: 160px; outline: none;" />
+            ${gridSearchQuery ? '<button id="grid-search-clear" style="position: absolute; right: 6px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px;">✕</button>' : ''}
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted);">
+            <span>Per page:</span>
+            <button class="grid-psize-btn ${gridPageSize === 24 ? 'active' : ''}" data-size="24">24</button>
+            <button class="grid-psize-btn ${gridPageSize === 48 ? 'active' : ''}" data-size="48">48</button>
+            <button class="grid-psize-btn ${gridPageSize === 1000 ? 'active' : ''}" data-size="1000">All</button>
+          </div>
+
+          ${totalPages > 1 ? `
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button id="grid-prev-btn" ${gridCurrentPage === 1 ? 'disabled' : ''} style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text-main); cursor: ${gridCurrentPage === 1 ? 'not-allowed' : 'pointer'}; opacity: ${gridCurrentPage === 1 ? '0.5' : '1'};">◀ Prev</button>
+            <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);">Page ${gridCurrentPage} of ${totalPages} (${startIdx + 1}–${endIdx} of ${filteredList.length})</span>
+            <button id="grid-next-btn" ${gridCurrentPage === totalPages ? 'disabled' : ''} style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text-main); cursor: ${gridCurrentPage === totalPages ? 'not-allowed' : 'pointer'}; opacity: ${gridCurrentPage === totalPages ? '0.5' : '1'};">Next ▶</button>
+          </div>
+          ` : `
+          <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);">Showing ${filteredList.length} stocks</span>
+          `}
+        </div>
+      `;
+
+      gridBox.appendChild(toolbar);
+
+      // Event listeners for toolbar
+      toolbar.querySelectorAll('.grid-scope-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          gridScope = btn.dataset.scope;
+          gridCurrentPage = 1;
+          renderMultiChartGrid();
+        });
+      });
+
+      const searchInp = toolbar.querySelector('#grid-search-input');
+      if (searchInp) {
+        searchInp.addEventListener('input', (e) => {
+          gridSearchQuery = e.target.value;
+          gridCurrentPage = 1;
+          renderMultiChartGrid();
+          setTimeout(() => {
+            const reInp = document.getElementById('grid-search-input');
+            if (reInp) {
+              reInp.focus();
+              reInp.setSelectionRange(reInp.value.length, reInp.value.length);
+            }
+          }, 0);
+        });
+      }
+
+      const searchClear = toolbar.querySelector('#grid-search-clear');
+      if (searchClear) {
+        searchClear.addEventListener('click', () => {
+          gridSearchQuery = '';
+          gridCurrentPage = 1;
+          renderMultiChartGrid();
+        });
+      }
+
+      toolbar.querySelectorAll('.grid-psize-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          gridPageSize = parseInt(btn.dataset.size, 10);
+          gridCurrentPage = 1;
+          renderMultiChartGrid();
+        });
+      });
+
+      const prevBtn = toolbar.querySelector('#grid-prev-btn');
+      if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+          if (gridCurrentPage > 1) {
+            gridCurrentPage--;
+            renderMultiChartGrid();
+          }
+        });
+      }
+
+      const nextBtn = toolbar.querySelector('#grid-next-btn');
+      if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+          if (gridCurrentPage < totalPages) {
+            gridCurrentPage++;
+            renderMultiChartGrid();
+          }
+        });
+      }
+
+      // Check empty state
+      if (pageItems.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-muted); gap: 12px;';
+        emptyEl.innerHTML = `
+          <div style="font-size: 15px; font-weight: 600;">No stocks found in ${gridScope === 'universe' ? 'Universe' : 'Top Movers'}</div>
+          <div style="font-size: 12px;">Try adjusting search, switching scope, or changing movers threshold.</div>
         `;
+        gridBox.appendChild(emptyEl);
         return;
       }
+
+      const cardsBox = document.createElement('div');
+      cardsBox.id = 'grid-cards-box';
+      gridBox.appendChild(cardsBox);
 
       const bgColor = isDark ? '#111726' : '#ffffff';
       const textColor = isDark ? '#94a3b8' : '#64748b';
       const gridColor = isDark ? '#1a233a' : '#f1f5f9';
 
-      for (const m of list) {
+      for (const item of pageItems) {
         const card = document.createElement('div');
         card.className = 'grid-chart-card';
-        card.id = `card-${m.symbol}`;
-        const isUp = m.change_percent >= 0;
+        card.id = `card-${item.symbol}`;
+
+        const isUp = item.change_percent != null ? item.change_percent >= 0 : true;
+        const priceText = item.price != null ? `₹${formatPrice(item.price)}` : '--';
+        const chgText = item.change_percent != null ? `${isUp ? '+' : ''}${item.change_percent.toFixed(2)}%` : '--';
+        const pillClass = item.change_percent != null ? (isUp ? 'up' : 'down') : '';
 
         card.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${escapeHtml(m.symbol)}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(m.name)}</div>
+            <div style="min-width: 0; padding-right: 8px;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${escapeHtml(item.symbol)}</div>
+              <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;">${escapeHtml(item.name)}</div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">₹${formatPrice(m.price)}</div>
-              <span class="stock-badge-pill ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${m.change_percent.toFixed(2)}%</span>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="card-price" style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${priceText}</div>
+              <span class="card-pill stock-badge-pill ${pillClass}">${chgText}</span>
             </div>
           </div>
           <div class="grid-chart-canvas"></div>
         `;
 
         card.addEventListener('click', () => {
-          const idx = (currentTab === 'movers' ? getFilteredMovers() : stocks).findIndex(s => s.symbol === m.symbol);
-          if (idx !== -1) selectStock(idx);
+          const idx = stocks.findIndex(s => s.symbol === item.symbol);
+          if (idx !== -1) {
+            if (currentTab === 'movers') {
+              tabUniverse.click();
+            }
+            selectStock(idx);
+          }
           setViewMode('single');
         });
 
-        gridBox.appendChild(card);
+        cardsBox.appendChild(card);
 
         const canvasEl = card.querySelector('.grid-chart-canvas');
         const miniChart = LightweightCharts.createChart(canvasEl, {
@@ -1933,13 +2147,28 @@
           upColor: '#16a34a', downColor: '#dc2626', borderUpColor: '#16a34a', borderDownColor: '#dc2626', wickUpColor: '#16a34a', wickDownColor: '#dc2626',
         });
 
-        fetch(`/api/candles?symbol=${encodeURIComponent(m.symbol)}&timeframe=${currentTimeframe}`)
+        fetch(`/api/candles?symbol=${encodeURIComponent(item.symbol)}&timeframe=${currentTimeframe}`)
           .then(r => r.json())
           .then(data => {
             if (Array.isArray(data) && data.length > 0) {
               miniSeries.setData(data.map(c => ({ time: c.timestamp, open: c.open, high: c.high, low: c.low, close: c.close })));
               miniChart.timeScale().fitContent();
               miniChart.timeScale().applyOptions({ barSpacing: userZoom, rightOffset: 3 });
+
+              const latest = data[data.length - 1];
+              const prev = data.length > 1 ? data[data.length - 2] : latest;
+              const chg = ((latest.close - prev.close) / prev.close) * 100;
+              const cUp = chg >= 0;
+
+              const priceEl = card.querySelector('.card-price');
+              const pillEl = card.querySelector('.card-pill');
+              if (priceEl && item.price == null) {
+                priceEl.textContent = `₹${formatPrice(latest.close)}`;
+              }
+              if (pillEl && item.change_percent == null) {
+                pillEl.textContent = `${cUp ? '+' : ''}${chg.toFixed(2)}%`;
+                pillEl.className = `card-pill stock-badge-pill ${cUp ? 'up' : 'down'}`;
+              }
             }
           })
           .catch(console.warn);
@@ -2337,7 +2566,13 @@
       if (sidebarFooter) sidebarFooter.style.display = 'block';
       currentTab = 'universe';
       renderStockList();
-      selectStock(0);
+      if (currentViewMode === 'grid') {
+        gridScope = 'universe';
+        gridCurrentPage = 1;
+        renderMultiChartGrid();
+      } else {
+        selectStock(0);
+      }
     });
 
     tabMovers.addEventListener('click', () => {
@@ -2347,6 +2582,10 @@
       if (moversToolbar) moversToolbar.style.display = 'flex';
       if (sidebarFooter) sidebarFooter.style.display = 'none';
       currentTab = 'movers';
+      if (currentViewMode === 'grid') {
+        gridScope = 'movers';
+        gridCurrentPage = 1;
+      }
       if (!moversData) {
         runScanMovers(false);
       } else {
