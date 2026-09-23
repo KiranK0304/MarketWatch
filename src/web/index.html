@@ -3856,25 +3856,27 @@
     });
 
     // Check Market Status (Indian Standard Time UTC+5:30)
-    function updateMarketStatus() {
-      const now = new Date();
-      // UTC to IST
-      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const ist = new Date(utc + (3600000 * 5.5));
-      const day = ist.getDay(); // 0 Sun, 6 Sat
-      const hours = ist.getHours();
-      const mins = ist.getMinutes();
-      const totalMins = hours * 60 + mins;
-
-      const isWeekday = day >= 1 && day <= 5;
-      const isOpen = isWeekday && totalMins >= (9 * 60 + 15) && totalMins < (15 * 60 + 30);
-
+    async function updateMarketStatus() {
+      let isOpen = false;
+      let isTradingDay = false;
+      try {
+        const res = await fetch('/api/market/status');
+        if (!res.ok) throw new Error('Market status unavailable');
+        const status = await res.json();
+        isOpen = status.is_open;
+        isTradingDay = status.is_trading_day;
+      } catch (e) {
+        console.warn('Failed to load market status', e);
+      }
       const dot = document.getElementById('market-dot');
       const lbl = document.getElementById('market-status-lbl');
 
       if (isOpen) {
         dot.style.background = 'var(--bullish)';
         lbl.textContent = 'NSE: Live (09:15 - 15:30 IST)';
+      } else if (!isTradingDay) {
+        dot.style.background = 'var(--bearish)';
+        lbl.textContent = 'NSE: Closed (Holiday / Weekend)';
       } else {
         dot.style.background = 'var(--bearish)';
         lbl.textContent = 'NSE: Market Closed';
@@ -3887,6 +3889,7 @@
       loadStocks();
       loadCachedMovers();
       updateMarketStatus();
+      setInterval(updateMarketStatus, 60 * 1000);
     });
   </script>
 </body>

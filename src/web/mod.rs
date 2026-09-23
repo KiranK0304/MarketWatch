@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{self, StockEntry};
 use crate::domain::{
-    CreateNoteInput, ScanResult, StockMover, StockNote, Timeframe, UpdateNoteInput,
+    CreateNoteInput, MarketCalendar, ScanResult, StockMover, StockNote, Timeframe, UpdateNoteInput,
 };
 use crate::provider::CandleSyncService;
 use crate::provider::yahoo::YahooProvider;
@@ -59,6 +59,12 @@ pub struct NotesQuery {
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     pub error: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MarketStatus {
+    pub is_open: bool,
+    pub is_trading_day: bool,
 }
 
 impl IntoResponse for ErrorResponse {
@@ -385,6 +391,15 @@ async fn get_scan_state() -> Json<ScanState> {
     Json(ScanState::load(&state_path))
 }
 
+/// Return the current market status using the shared NSE calendar.
+async fn get_market_status() -> Json<MarketStatus> {
+    let now = crate::domain::calendar::now_ist();
+    Json(MarketStatus {
+        is_open: MarketCalendar::is_market_open(now),
+        is_trading_day: MarketCalendar::is_trading_day(now.date_naive()),
+    })
+}
+
 /// Get cache synchronization metadata for a symbol and timeframe.
 async fn get_cache_meta(
     State(state): State<WebState>,
@@ -551,6 +566,7 @@ pub fn create_router(state: WebState) -> Router {
         .route("/api/scan", get(scan_movers))
         .route("/api/scan/cached", get(get_scan_cached))
         .route("/api/scan/state", get(get_scan_state))
+        .route("/api/market/status", get(get_market_status))
         .route("/api/notes", get(list_notes).post(create_note))
         .route(
             "/api/notes/{id}",

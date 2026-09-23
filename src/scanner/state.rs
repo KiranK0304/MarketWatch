@@ -1,10 +1,10 @@
 //! Persistence and state tracking for scheduled scans and automatic catch-up.
 
-use chrono::{DateTime, Datelike, FixedOffset, Timelike};
+use chrono::{DateTime, FixedOffset, Timelike};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use crate::domain::ScanResult;
+use crate::domain::{MarketCalendar, ScanResult};
 use crate::error::MarketError;
 
 /// Which market scan slot is scheduled or pending.
@@ -97,18 +97,7 @@ impl ScanState {
     /// Morning is returned before evening so a catch-up run cannot skip the
     /// earlier slot when both scheduled scans were missed.
     pub fn determine_pending_slots(&self, ist_now: DateTime<FixedOffset>) -> Vec<ScheduledSlot> {
-        let weekday = ist_now.weekday();
-        // Indian stock exchanges (NSE/BSE) trade Monday to Friday
-        let is_trading_day = matches!(
-            weekday,
-            chrono::Weekday::Mon
-                | chrono::Weekday::Tue
-                | chrono::Weekday::Wed
-                | chrono::Weekday::Thu
-                | chrono::Weekday::Fri
-        );
-
-        if !is_trading_day {
+        if !MarketCalendar::is_trading_day(ist_now.date_naive()) {
             return Vec::new();
         }
 

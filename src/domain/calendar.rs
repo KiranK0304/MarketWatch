@@ -293,8 +293,11 @@ impl MarketCalendar {
             let mon_dt = mon_date.and_hms_opt(0, 0, 0).expect("Valid 00:00");
             let mon_ist =
                 DateTime::<FixedOffset>::from_naive_utc_and_offset(mon_dt - offset, offset);
-            let is_forming =
-                current_minutes < MARKET_CLOSE_MINUTES_TOTAL || date.weekday() != Weekday::Fri;
+            let is_forming = matches!(
+                date.weekday(),
+                Weekday::Mon | Weekday::Tue | Weekday::Wed | Weekday::Thu
+            ) || (date.weekday() == Weekday::Fri
+                && current_minutes < MARKET_CLOSE_MINUTES_TOTAL);
             return ExpectedCandle {
                 timestamp: mon_ist.timestamp(),
                 is_forming,
