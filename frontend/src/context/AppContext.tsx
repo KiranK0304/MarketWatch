@@ -72,6 +72,7 @@ interface AppContextValue {
 
   // Market Status & Cache Latency
   marketStatus: MarketStatus;
+  marketStatusLoaded: boolean;
   cacheLatency: string;
   setCacheLatency: (latency: string) => void;
   chartCacheHeader: string;
@@ -146,6 +147,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Market Status & Latency
   const [marketStatus, setMarketStatus] = useState<MarketStatus>({ is_open: false, is_trading_day: false });
+  const [marketStatusLoaded, setMarketStatusLoaded] = useState(false);
   const [cacheLatency, setCacheLatency] = useState<string>('--');
   const [chartCacheHeader, setChartCacheHeader] = useState<string>('UNKNOWN');
   const [latestPrice, setLatestPrice] = useState<number>(0);
@@ -203,6 +205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const status = await api.getMarketStatus();
       setMarketStatus(status);
+      setMarketStatusLoaded(true);
     } catch (_) {
       // ignore
     }
@@ -395,6 +398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setJournalFilterStatus,
 
     marketStatus,
+    marketStatusLoaded,
     cacheLatency,
     setCacheLatency,
     chartCacheHeader,

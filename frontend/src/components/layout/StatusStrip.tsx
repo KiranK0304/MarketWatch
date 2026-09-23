@@ -2,17 +2,25 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 
 export const StatusStrip: React.FC = () => {
-  const { marketStatus, cacheLatency } = useApp();
+  const { marketStatus, marketStatusLoaded, cacheLatency } = useApp();
 
   return (
     <footer className="status-strip">
       <div className="status-item">
         <div
           className="status-indicator-dot"
-          style={{ background: marketStatus.is_open ? 'var(--bullish)' : 'var(--bearish)' }}
+          style={{
+            background: !marketStatusLoaded
+              ? 'var(--text-muted)'
+              : marketStatus.is_open
+              ? 'var(--bullish)'
+              : 'var(--bearish)',
+          }}
         />
         <span>
-          {marketStatus.is_open
+          {!marketStatusLoaded
+            ? 'NSE: Checking status...'
+            : marketStatus.is_open
             ? 'NSE: Live (09:15 - 15:30 IST)'
             : !marketStatus.is_trading_day
             ? 'NSE: Closed (Holiday / Weekend)'
