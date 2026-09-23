@@ -930,6 +930,63 @@
     }
     .copy-chip:hover { background: var(--accent); color: white; }
 
+    /* Journal Notes Drawer Cards */
+    .journal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.15s ease;
+    }
+    .journal-card:hover {
+      border-color: var(--accent);
+    }
+    .journal-status-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .journal-status-pill.open {
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+    .journal-status-pill.validated {
+      background: rgba(22, 163, 74, 0.15);
+      color: #16a34a;
+      border: 1px solid rgba(22, 163, 74, 0.3);
+    }
+    .journal-status-pill.invalidated {
+      background: rgba(220, 38, 38, 0.15);
+      color: #dc2626;
+      border: 1px solid rgba(220, 38, 38, 0.3);
+    }
+    .journal-ref-link {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      background: var(--bg-hover);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .journal-ref-link:hover {
+      background: var(--accent);
+      color: white;
+    }
+
     /* 5. Bottom Status Strip */
     .status-strip {
       height: 26px;
@@ -1267,6 +1324,14 @@
           <span>Sync</span>
         </button>
 
+        <button class="top-action-btn" id="btn-add-note" title="Log Trading Analysis Note for this Stock (N)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <span>Note</span>
+        </button>
+
         <button class="top-action-btn" id="btn-top-shortcuts" title="Keyboard Shortcuts (?)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="2" y="4" width="20" height="16" rx="2"></rect>
@@ -1308,6 +1373,7 @@
         <div class="drawer-header">
           <div class="drawer-nav-tabs">
             <button class="drawer-tab active" data-tab="ai">🧠 AI Insights</button>
+            <button class="drawer-tab" data-tab="journal">📝 Journal</button>
             <button class="drawer-tab" data-tab="fundamentals">📊 Fundamentals</button>
             <button class="drawer-tab" data-tab="system">⚙️ System & Logs</button>
           </div>
@@ -1362,7 +1428,98 @@
     </div>
   </div>
 
-  <!-- 8. Keyboard Shortcuts Modal -->
+  <!-- 8. Log / Edit Analysis Note Modal -->
+  <div class="modal-backdrop" id="modal-note">
+    <div class="modal-card" style="width: 500px; max-width: 90vw; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+          <span>📝</span>
+          <span id="note-modal-title">Log Analysis Note</span>
+        </div>
+        <button id="btn-close-note-modal" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+      </div>
+
+      <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); background: var(--bg-hover); padding: 8px 10px; border-radius: 6px; margin: 10px 0; flex-wrap: wrap;">
+        <div>Symbol: <strong id="note-meta-sym" style="color: var(--text-main);">--</strong></div>
+        <div>Timeframe: <strong id="note-meta-tf" style="color: var(--text-main);">--</strong></div>
+        <div>Price: <strong id="note-meta-price" style="color: var(--text-main);">--</strong></div>
+        <input type="hidden" id="note-input-candle-ts" />
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div>
+          <label style="font-size: 11px; color: var(--text-muted);">Title / Setup Headline *</label>
+          <input type="text" class="modal-input" id="note-input-title" placeholder="e.g. Bullish momentum breakout above 200 EMA">
+        </div>
+        <div>
+          <label style="font-size: 11px; color: var(--text-muted);">Thesis & Technical Observations *</label>
+          <textarea class="modal-input" id="note-input-content" rows="4" placeholder="Volume surge, RSI divergence, support level holding..." style="resize: vertical; font-family: inherit; line-height: 1.4;"></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted);">Target Price (₹, optional)</label>
+            <input type="number" step="0.05" class="modal-input" id="note-input-target" placeholder="e.g. 1720.00">
+          </div>
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted);">Stop Loss (₹, optional)</label>
+            <input type="number" step="0.05" class="modal-input" id="note-input-stop" placeholder="e.g. 1610.00">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 11px; color: var(--text-muted);">Tags (comma-separated)</label>
+          <input type="text" class="modal-input" id="note-input-tags" placeholder="e.g. momentum, breakout, resistance">
+        </div>
+
+        <div>
+          <label style="font-size: 11px; color: var(--text-muted);">Link Previous Notes (References)</label>
+          <select id="note-input-refs" multiple class="modal-input" style="height: 65px; font-size: 11px;"></select>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Hold Ctrl/Cmd to select multiple referenced notes</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px;">
+        <button class="top-action-btn" id="btn-cancel-note">Cancel</button>
+        <button class="top-action-btn active" id="btn-save-note">Save Note</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. Audit / Verify Outcome Modal -->
+  <div class="modal-backdrop" id="modal-audit-note">
+    <div class="modal-card" style="width: 440px; max-width: 90vw;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <div style="font-weight: 700; font-size: 14px;">Verify / Audit Setup Outcome</div>
+        <button id="btn-close-audit-modal" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+      </div>
+      <input type="hidden" id="audit-note-id" />
+      <div style="margin: 10px 0;">
+        <div style="font-weight: 600; font-size: 13px;" id="audit-note-title">--</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="audit-note-subtitle">--</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div>
+          <label style="font-size: 11px; color: var(--text-muted);">Outcome Status</label>
+          <select id="audit-status" class="modal-input">
+            <option value="validated">✅ Validated (Hit Target / Worked)</option>
+            <option value="invalidated">❌ Invalidated (Hit Stop Loss / Failed)</option>
+            <option value="open">⏳ Pending / Keep Open</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 11px; color: var(--text-muted);">Outcome Retrospective Note</label>
+          <textarea id="audit-outcome-note" class="modal-input" rows="3" placeholder="What happened? Did momentum hold? What did we learn?"></textarea>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;">
+        <button class="top-action-btn" id="btn-cancel-audit">Cancel</button>
+        <button class="top-action-btn active" id="btn-save-audit">Update Outcome</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. Keyboard Shortcuts Modal -->
   <div class="modal-backdrop" id="modal-shortcuts">
     <div class="modal-card" style="width: 540px; max-width: 90vw; max-height: 85vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
@@ -1389,7 +1546,7 @@
           <div class="shortcut-row"><span>Command Palette</span><div><kbd>Ctrl</kbd>+<kbd>k</kbd></div></div>
           <div class="shortcut-row"><span>Timeframe 5m..1w</span><div><kbd>1</kbd> – <kbd>6</kbd></div></div>
           <div class="shortcut-row"><span>Remote Sync Data</span><div><kbd>r</kbd></div></div>
-          <div class="shortcut-row"><span>Toggle Theme</span><div><kbd>t</kbd></div></div>
+          <div class="shortcut-row"><span>Log Trading Note</span><div><kbd>n</kbd></div></div>
           <div class="shortcut-row"><span>Intel & Research Drawer</span><div><kbd>i</kbd></div></div>
           <div class="shortcut-row"><span>Shortcuts Help</span><div><kbd>?</kbd></div></div>
           <div class="shortcut-row"><span>Close Any Modal</span><div><kbd>Esc</kbd></div></div>
@@ -1428,6 +1585,8 @@
     let gridSearchQuery = '';
     let gridCurrentPage = 1;
     let gridPageSize = 24;
+    let journalFilterScope = 'stock'; // 'stock' | 'all'
+    let journalFilterStatus = 'all'; // 'all' | 'open' | 'validated' | 'invalidated'
 
     // Elements
     const sidebar = document.getElementById('sidebar');
@@ -1650,6 +1809,11 @@
       chgEl.style.color = isUp ? 'var(--bullish)' : 'var(--bearish)';
 
       updateHeaderFromLatest();
+      const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+      const activeStock = activeList[currentIndex] || activeList[0];
+      if (activeStock) {
+        updateChartNoteMarkers(activeStock.symbol);
+      }
     }
 
     // Load Stock Universe from Backend
@@ -2372,6 +2536,8 @@
             </div>
           </div>
         `;
+      } else if (tabKey === 'journal') {
+        renderJournalTab(stock);
       }
     }
 
@@ -2382,8 +2548,554 @@
       setTimeout(() => btn.textContent = orig, 1500);
     }
 
+    // Chart Note Markers
+    let currentStockNotes = [];
+
+    async function updateChartNoteMarkers(symbol) {
+      if (!candleSeries || !candleData || candleData.length === 0) return;
+      try {
+        const res = await fetch(`/api/notes?symbol=${encodeURIComponent(symbol)}`);
+        if (!res.ok) return;
+        const notes = await res.json();
+        currentStockNotes = notes;
+
+        const markers = [];
+        for (const note of notes) {
+          let markerTime = note.candle_timestamp;
+          if (!markerTime && note.created_at) {
+            markerTime = note.created_at;
+          }
+
+          if (markerTime && candleData.length > 0) {
+            let closestCandle = candleData[0];
+            let minDiff = Math.abs(candleData[0].timestamp - markerTime);
+            for (let i = 1; i < candleData.length; i++) {
+              const diff = Math.abs(candleData[i].timestamp - markerTime);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestCandle = candleData[i];
+              }
+            }
+
+            let color = '#818cf8';
+            let shape = 'circle';
+            let icon = '📝';
+            if (note.status === 'validated') {
+              color = '#16a34a';
+              shape = 'arrowUp';
+              icon = '✅';
+            } else if (note.status === 'invalidated') {
+              color = '#dc2626';
+              shape = 'arrowDown';
+              icon = '❌';
+            }
+
+            markers.push({
+              time: closestCandle.timestamp,
+              position: note.status === 'invalidated' ? 'aboveBar' : 'belowBar',
+              color: color,
+              shape: shape,
+              text: `${icon} #${note.id}: ${note.title.slice(0, 14)}`,
+              id: note.id,
+            });
+          }
+        }
+
+        markers.sort((a, b) => a.time - b.time || a.id - b.id);
+        candleSeries.setMarkers(markers);
+      } catch (e) {
+        console.warn('Failed to load chart note markers', e);
+      }
+    }
+
+    // Right Drawer - Journal Tab
+    async function renderJournalTab(stock) {
+      if (!stock) return;
+      const targetSym = journalFilterScope === 'stock' ? stock.symbol : null;
+      let url = '/api/notes';
+      const params = [];
+      if (targetSym) params.push(`symbol=${encodeURIComponent(targetSym)}`);
+      if (journalFilterStatus !== 'all') params.push(`status=${encodeURIComponent(journalFilterStatus)}`);
+      if (params.length > 0) url += '?' + params.join('&');
+
+      drawerContent.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 13px;">📝 Trading Journal</div>
+            <button class="top-action-btn active" id="btn-journal-new" style="font-size: 11px; padding: 3px 8px;">+ New Note</button>
+          </div>
+
+          <div style="display: flex; gap: 4px; background: var(--bg-surface); padding: 3px; border-radius: 6px; border: 1px solid var(--border);">
+            <button class="journal-scope-btn ${journalFilterScope === 'stock' ? 'active' : ''}" data-scope="stock" style="flex: 1; padding: 4px; font-size: 10px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: ${journalFilterScope === 'stock' ? 'var(--accent)' : 'transparent'}; color: ${journalFilterScope === 'stock' ? 'white' : 'var(--text-muted)'};">
+              ${escapeHtml(stock.symbol)}
+            </button>
+            <button class="journal-scope-btn ${journalFilterScope === 'all' ? 'active' : ''}" data-scope="all" style="flex: 1; padding: 4px; font-size: 10px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: ${journalFilterScope === 'all' ? 'var(--accent)' : 'transparent'}; color: ${journalFilterScope === 'all' ? 'white' : 'var(--text-muted)'};">
+              All Universe
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px;">
+            <button class="filter-pill ${journalFilterStatus === 'all' ? 'active' : ''}" data-status="all" style="font-size: 10px; padding: 2px 7px;">All</button>
+            <button class="filter-pill ${journalFilterStatus === 'open' ? 'active' : ''}" data-status="open" style="font-size: 10px; padding: 2px 7px;">Open ⏳</button>
+            <button class="filter-pill ${journalFilterStatus === 'validated' ? 'active' : ''}" data-status="validated" style="font-size: 10px; padding: 2px 7px;">Validated ✅</button>
+            <button class="filter-pill ${journalFilterStatus === 'invalidated' ? 'active' : ''}" data-status="invalidated" style="font-size: 10px; padding: 2px 7px;">Invalidated ❌</button>
+          </div>
+        </div>
+
+        <div id="journal-notes-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Loading notes...</div>
+        </div>
+      `;
+
+      const btnNew = document.getElementById('btn-journal-new');
+      if (btnNew) btnNew.addEventListener('click', () => openNoteModal(stock));
+
+      document.querySelectorAll('.journal-scope-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          journalFilterScope = btn.dataset.scope;
+          renderJournalTab(stock);
+        });
+      });
+
+      document.querySelectorAll('.filter-pill[data-status]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          journalFilterStatus = btn.dataset.status;
+          renderJournalTab(stock);
+        });
+      });
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load notes');
+        const notes = await res.json();
+        const listEl = document.getElementById('journal-notes-list');
+        if (!listEl) return;
+
+        if (notes.length === 0) {
+          listEl.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 30px 10px; background: var(--bg-surface); border: 1px dashed var(--border); border-radius: 8px;">
+              <div style="font-size: 24px; margin-bottom: 6px;">📝</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">No Analysis Notes Found</div>
+              <div style="font-size: 11px;">Press <kbd>n</kbd> or click <b>+ New Note</b> to log an observation, momentum setup, or price thesis.</div>
+            </div>
+          `;
+          return;
+        }
+
+        listEl.innerHTML = '';
+        notes.forEach(note => {
+          const card = document.createElement('div');
+          card.className = 'journal-card';
+          card.id = `note-card-${note.id}`;
+
+          const dateStr = new Date(note.created_at * 1000).toLocaleString('en-IN', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+
+          let tagsHtml = '';
+          if (note.tags) {
+            tagsHtml = note.tags.split(',')
+              .map(t => t.trim())
+              .filter(Boolean)
+              .map(t => `<span style="font-size: 10px; background: var(--bg-hover); color: var(--text-muted); padding: 1px 5px; border-radius: 3px;">#${escapeHtml(t)}</span>`)
+              .join(' ');
+          }
+
+          let refsHtml = '';
+          if (Array.isArray(note.reference_note_ids) && note.reference_note_ids.length > 0) {
+            refsHtml = `
+              <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
+                <span style="font-size: 10px; color: var(--text-muted);">Refs:</span>
+                ${note.reference_note_ids.map(rid => `
+                  <a class="journal-ref-link" onclick="navigateToNote(${rid})" title="Jump to Note #${rid}">↳ Ref #${rid}</a>
+                `).join('')}
+              </div>
+            `;
+          }
+
+          let outcomeHtml = '';
+          if (note.status !== 'open' || note.outcome_note) {
+            const isVal = note.status === 'validated';
+            const isInv = note.status === 'invalidated';
+            const borderColor = isVal ? 'var(--bullish)' : (isInv ? 'var(--bearish)' : 'var(--accent)');
+            const statusLabel = isVal ? 'Validated ✅' : (isInv ? 'Invalidated ❌' : 'Outcome Review');
+            outcomeHtml = `
+              <div style="background: var(--bg-subtle); border-left: 3px solid ${borderColor}; padding: 6px 8px; border-radius: 4px; font-size: 11px;">
+                <div style="font-weight: 700; color: ${borderColor}; margin-bottom: 2px;">${statusLabel}</div>
+                <div style="color: var(--text-secondary); line-height: 1.4;">${escapeHtml(note.outcome_note || 'Status updated.')}</div>
+              </div>
+            `;
+          }
+
+          let targetsHtml = '';
+          if (note.target_price || note.stop_loss) {
+            targetsHtml = `
+              <div style="display: flex; gap: 8px; font-size: 11px; margin-top: 2px;">
+                ${note.target_price ? `<span style="color: var(--bullish);">🎯 Target: ₹${formatPrice(note.target_price)}</span>` : ''}
+                ${note.stop_loss ? `<span style="color: var(--bearish);">🛑 SL: ₹${formatPrice(note.stop_loss)}</span>` : ''}
+              </div>
+            `;
+          }
+
+          card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <a style="font-weight: 700; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: none;" onclick="switchStockBySymbol('${escapeHtml(note.symbol)}')">${escapeHtml(note.symbol)}</a>
+                <span style="font-size: 10px; color: var(--text-muted); background: var(--bg-hover); padding: 1px 4px; border-radius: 3px;">${escapeHtml(note.timeframe)}</span>
+                <span class="journal-status-pill ${note.status}">${note.status}</span>
+              </div>
+              <span style="font-size: 10px; color: var(--text-muted); white-space: nowrap;">${dateStr}</span>
+            </div>
+
+            <div style="font-weight: 700; font-size: 13px; color: var(--text-primary); line-height: 1.3;">
+              #${note.id}: ${escapeHtml(note.title)}
+            </div>
+
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Price at note: <strong style="color: var(--text-primary);">₹${formatPrice(note.price_at_note)}</strong>
+            </div>
+
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; white-space: pre-wrap;">${escapeHtml(note.content)}</div>
+
+            ${targetsHtml}
+            ${tagsHtml ? `<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px;">${tagsHtml}</div>` : ''}
+            ${refsHtml}
+            ${outcomeHtml}
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 6px; margin-top: 4px;">
+              <button class="top-action-btn" style="font-size: 10px; padding: 2px 6px;" onclick="openAuditModalById(${note.id})">
+                ${note.status === 'open' ? '⚖️ Verify Outcome' : '✏️ Edit Outcome'}
+              </button>
+              <div style="display: flex; gap: 4px;">
+                <button class="top-action-btn" style="font-size: 10px; padding: 2px 6px;" onclick="openEditNoteModalById(${note.id})">Edit</button>
+                <button class="top-action-btn" style="font-size: 10px; padding: 2px 6px; color: var(--bearish);" onclick="deleteNote(${note.id})">Delete</button>
+              </div>
+            </div>
+          `;
+          listEl.appendChild(card);
+        });
+      } catch (e) {
+        const listEl = document.getElementById('journal-notes-list');
+        if (listEl) {
+          listEl.innerHTML = `<div style="color: var(--bearish); font-size: 12px;">Failed to load journal notes: ${escapeHtml(e.message)}</div>`;
+        }
+      }
+    }
+
+    // Modal: Note Logging & Editing
+    let currentEditingNoteId = null;
+
+    async function openNoteModal(stock, editingNote = null) {
+      const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+      const curStock = stock || activeList[currentIndex] || activeList[0];
+      if (!curStock) return;
+
+      const modal = document.getElementById('modal-note');
+      const titleEl = document.getElementById('note-modal-title');
+      const symEl = document.getElementById('note-meta-sym');
+      const tfEl = document.getElementById('note-meta-tf');
+      const priceEl = document.getElementById('note-meta-price');
+      const candleTsInp = document.getElementById('note-input-candle-ts');
+      const titleInp = document.getElementById('note-input-title');
+      const contentInp = document.getElementById('note-input-content');
+      const targetInp = document.getElementById('note-input-target');
+      const stopInp = document.getElementById('note-input-stop');
+      const tagsInp = document.getElementById('note-input-tags');
+      const refsSelect = document.getElementById('note-input-refs');
+
+      if (editingNote) {
+        currentEditingNoteId = editingNote.id;
+        titleEl.textContent = `Edit Analysis Note #${editingNote.id}`;
+        symEl.textContent = editingNote.symbol;
+        tfEl.textContent = editingNote.timeframe;
+        priceEl.textContent = `₹${formatPrice(editingNote.price_at_note)}`;
+        candleTsInp.value = editingNote.candle_timestamp || '';
+        titleInp.value = editingNote.title || '';
+        contentInp.value = editingNote.content || '';
+        targetInp.value = editingNote.target_price != null ? editingNote.target_price : '';
+        stopInp.value = editingNote.stop_loss != null ? editingNote.stop_loss : '';
+        tagsInp.value = editingNote.tags || '';
+      } else {
+        currentEditingNoteId = null;
+        titleEl.textContent = 'Log Analysis Note';
+        symEl.textContent = curStock.symbol;
+        tfEl.textContent = currentTimeframe;
+
+        const latestCandle = candleData && candleData.length > 0 ? candleData[candleData.length - 1] : null;
+        const curPrice = latestCandle ? latestCandle.close : (curStock.price || 0);
+        priceEl.textContent = `₹${formatPrice(curPrice)}`;
+        candleTsInp.value = latestCandle ? latestCandle.timestamp : Math.floor(Date.now() / 1000);
+
+        titleInp.value = '';
+        contentInp.value = '';
+        targetInp.value = '';
+        stopInp.value = '';
+        tagsInp.value = '';
+      }
+
+      refsSelect.innerHTML = '';
+      try {
+        const res = await fetch('/api/notes');
+        if (res.ok) {
+          const allNotes = await res.json();
+          const existingRefs = (editingNote && Array.isArray(editingNote.reference_note_ids)) ? editingNote.reference_note_ids : [];
+          allNotes.forEach(n => {
+            if (editingNote && n.id === editingNote.id) return;
+            const opt = document.createElement('option');
+            opt.value = n.id;
+            opt.textContent = `#${n.id} [${n.symbol}] ${n.title.slice(0, 35)}`;
+            if (existingRefs.includes(n.id)) opt.selected = true;
+            refsSelect.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load notes for references', e);
+      }
+
+      modal.classList.add('open');
+      setTimeout(() => titleInp.focus(), 50);
+    }
+
+    function closeNoteModal() {
+      const modal = document.getElementById('modal-note');
+      if (modal) modal.classList.remove('open');
+      currentEditingNoteId = null;
+    }
+
+    async function saveNote() {
+      const titleInp = document.getElementById('note-input-title');
+      const contentInp = document.getElementById('note-input-content');
+      const targetInp = document.getElementById('note-input-target');
+      const stopInp = document.getElementById('note-input-stop');
+      const tagsInp = document.getElementById('note-input-tags');
+      const refsSelect = document.getElementById('note-input-refs');
+
+      const title = titleInp.value.trim();
+      const content = contentInp.value.trim();
+      if (!title) {
+        showToast('Please enter a note title/headline');
+        titleInp.focus();
+        return;
+      }
+      if (!content) {
+        showToast('Please enter technical thesis/content');
+        contentInp.focus();
+        return;
+      }
+
+      const targetPrice = targetInp.value.trim() ? parseFloat(targetInp.value) : null;
+      const stopLoss = stopInp.value.trim() ? parseFloat(stopInp.value) : null;
+      const tags = tagsInp.value.trim();
+      const selectedRefs = Array.from(refsSelect.selectedOptions).map(o => parseInt(o.value, 10));
+
+      const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+      const stock = activeList[currentIndex] || activeList[0];
+
+      try {
+        if (currentEditingNoteId) {
+          const res = await fetch(`/api/notes/${currentEditingNoteId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: title,
+              content: content,
+              tags: tags,
+              target_price: targetPrice,
+              stop_loss: stopLoss,
+              reference_note_ids: selectedRefs,
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to update note');
+          }
+          showToast(`Note #${currentEditingNoteId} updated`);
+        } else {
+          const symbol = document.getElementById('note-meta-sym').textContent;
+          const tf = document.getElementById('note-meta-tf').textContent;
+          const priceRaw = document.getElementById('note-meta-price').textContent.replace(/[^\d.]/g, '');
+          const priceAtNote = parseFloat(priceRaw) || 0;
+          const candleTsRaw = document.getElementById('note-input-candle-ts').value;
+          const candleTs = candleTsRaw ? parseInt(candleTsRaw, 10) : null;
+
+          const res = await fetch('/api/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              symbol: symbol,
+              timeframe: tf,
+              candle_timestamp: candleTs,
+              price_at_note: priceAtNote,
+              title: title,
+              content: content,
+              tags: tags,
+              target_price: targetPrice,
+              stop_loss: stopLoss,
+              reference_note_ids: selectedRefs,
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to create note');
+          }
+          const created = await res.json();
+          showToast(`Note #${created.id} saved for ${symbol}`);
+        }
+
+        closeNoteModal();
+        if (stock) {
+          updateChartNoteMarkers(stock.symbol);
+          if (currentDrawerTab === 'journal') {
+            renderJournalTab(stock);
+          }
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    }
+
+    // Modal: Outcome Audit / Verification
+    function openAuditModal(note) {
+      document.getElementById('audit-note-id').value = note.id;
+      document.getElementById('audit-note-title').textContent = `#${note.id}: ${note.title}`;
+      document.getElementById('audit-note-subtitle').textContent = `${note.symbol} @ ₹${formatPrice(note.price_at_note)} · ${note.timeframe}`;
+      document.getElementById('audit-status').value = note.status || 'open';
+      document.getElementById('audit-outcome-note').value = note.outcome_note || '';
+
+      document.getElementById('modal-audit-note').classList.add('open');
+      setTimeout(() => document.getElementById('audit-outcome-note').focus(), 50);
+    }
+
+    function closeAuditModal() {
+      const modal = document.getElementById('modal-audit-note');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function saveAudit() {
+      const id = parseInt(document.getElementById('audit-note-id').value, 10);
+      const status = document.getElementById('audit-status').value;
+      const outcomeNote = document.getElementById('audit-outcome-note').value.trim();
+
+      try {
+        const res = await fetch(`/api/notes/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: status,
+            outcome_note: outcomeNote,
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to update outcome');
+        }
+        showToast(`Audit saved for Note #${id}`);
+        closeAuditModal();
+
+        const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+        const stock = activeList[currentIndex] || activeList[0];
+        if (stock) {
+          updateChartNoteMarkers(stock.symbol);
+          if (currentDrawerTab === 'journal') {
+            renderJournalTab(stock);
+          }
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    }
+
+    async function openAuditModalById(id) {
+      try {
+        const res = await fetch(`/api/notes/${id}`);
+        if (!res.ok) throw new Error('Note not found');
+        const note = await res.json();
+        openAuditModal(note);
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    }
+
+    async function openEditNoteModalById(id) {
+      try {
+        const res = await fetch(`/api/notes/${id}`);
+        if (!res.ok) throw new Error('Note not found');
+        const note = await res.json();
+        const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+        const stock = activeList.find(s => s.symbol === note.symbol) || activeList[0];
+        openNoteModal(stock, note);
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    }
+
+    async function deleteNote(id) {
+      if (!confirm(`Are you sure you want to delete Note #${id}?`)) return;
+      try {
+        const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete note');
+        showToast(`Note #${id} deleted`);
+
+        const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+        const stock = activeList[currentIndex] || activeList[0];
+        if (stock) {
+          updateChartNoteMarkers(stock.symbol);
+          if (currentDrawerTab === 'journal') {
+            renderJournalTab(stock);
+          }
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    }
+
+    function switchStockBySymbol(symbol) {
+      const idx = stocks.findIndex(s => s.symbol === symbol);
+      if (idx !== -1) {
+        if (currentTab !== 'universe') {
+          tabUniverse.click();
+        }
+        selectStock(idx);
+      }
+    }
+
+    async function navigateToNote(noteId) {
+      try {
+        const res = await fetch(`/api/notes/${noteId}`);
+        if (!res.ok) throw new Error('Note not found');
+        const note = await res.json();
+        switchStockBySymbol(note.symbol);
+        showToast(`Jumped to Ref #${note.id} (${note.symbol})`);
+
+        if (intelDrawer.classList.contains('collapsed')) {
+          toggleIntelDrawer();
+        }
+        renderDrawerTab('journal');
+
+        setTimeout(() => {
+          const card = document.getElementById(`note-card-${note.id}`);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.style.outline = '2px solid var(--accent)';
+            setTimeout(() => card.style.outline = '', 2000);
+          }
+        }, 300);
+      } catch (e) {
+        showToast('Failed to navigate: ' + e.message);
+      }
+    }
+
     // Command Palette Setup
     const paletteActions = [
+      { name: 'Log Analysis Note (Active Stock)', tag: 'note journal thesis', run: () => {
+        const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+        const stock = activeList[currentIndex] || activeList[0];
+        if (stock) openNoteModal(stock);
+      }},
+      { name: 'Open Trading Journal Drawer', tag: 'journal notes log', run: () => {
+        if (intelDrawer.classList.contains('collapsed')) toggleIntelDrawer();
+        renderDrawerTab('journal');
+      }},
       { name: 'Force Sync / Remote Refresh', tag: 'sync', run: () => fetchChartData(true) },
       { name: 'Restart MarketWatch Web Service', tag: 'systemctl restart', run: () => {
         fetch('/api/scan/state').then(() => showToast('Command: systemctl --user restart marketwatch-web.service'));
@@ -2671,6 +3383,44 @@
       addStock(sym, nm);
     });
 
+    // Analysis Note & Audit Modals
+    const btnAddNote = document.getElementById('btn-add-note');
+    if (btnAddNote) {
+      btnAddNote.addEventListener('click', () => {
+        const activeList = currentTab === 'movers' ? getFilteredMovers() : stocks;
+        const stock = activeList[currentIndex] || activeList[0];
+        if (stock) openNoteModal(stock);
+      });
+    }
+
+    const btnCloseNoteModal = document.getElementById('btn-close-note-modal');
+    if (btnCloseNoteModal) btnCloseNoteModal.addEventListener('click', closeNoteModal);
+    const btnCancelNote = document.getElementById('btn-cancel-note');
+    if (btnCancelNote) btnCancelNote.addEventListener('click', closeNoteModal);
+    const btnSaveNote = document.getElementById('btn-save-note');
+    if (btnSaveNote) btnSaveNote.addEventListener('click', saveNote);
+
+    const modalNote = document.getElementById('modal-note');
+    if (modalNote) {
+      modalNote.addEventListener('click', (e) => {
+        if (e.target === modalNote) closeNoteModal();
+      });
+    }
+
+    const btnCloseAuditModal = document.getElementById('btn-close-audit-modal');
+    if (btnCloseAuditModal) btnCloseAuditModal.addEventListener('click', closeAuditModal);
+    const btnCancelAudit = document.getElementById('btn-cancel-audit');
+    if (btnCancelAudit) btnCancelAudit.addEventListener('click', closeAuditModal);
+    const btnSaveAudit = document.getElementById('btn-save-audit');
+    if (btnSaveAudit) btnSaveAudit.addEventListener('click', saveAudit);
+
+    const modalAudit = document.getElementById('modal-audit-note');
+    if (modalAudit) {
+      modalAudit.addEventListener('click', (e) => {
+        if (e.target === modalAudit) closeAuditModal();
+      });
+    }
+
     // Theme Toggle
     function toggleTheme() {
       isDark = !isDark;
@@ -2695,6 +3445,8 @@
       if (e.key === 'Escape') {
         closePalette();
         closeShortcutsModal();
+        closeNoteModal();
+        closeAuditModal();
         const addModal = document.getElementById('modal-add');
         if (addModal) addModal.classList.remove('open');
         if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
@@ -2730,6 +3482,10 @@
         e.preventDefault();
         if (currentTab === 'movers') runScanMovers(true);
         else fetchChartData(true);
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        const activeStock = activeList[currentIndex] || activeList[0];
+        if (activeStock) openNoteModal(activeStock);
       } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 't') {
         e.preventDefault();
         toggleTheme();
