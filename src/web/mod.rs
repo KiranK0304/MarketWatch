@@ -454,38 +454,23 @@ async fn create_note(
     State(state): State<WebState>,
     Json(input): Json<CreateNoteInput>,
 ) -> Result<(StatusCode, Json<StockNote>), (StatusCode, Json<ErrorResponse>)> {
-    if input.symbol.trim().is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Stock symbol cannot be empty".to_string(),
-            }),
-        ));
-    }
-    if input.title.trim().is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Note title cannot be empty".to_string(),
-            }),
-        ));
-    }
-    if input.content.trim().is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Note content cannot be empty".to_string(),
-            }),
-        ));
+    if let Err(e) = input.validate() {
+        return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })));
     }
 
-    let note = state.db.create_note(&input).map_err(|e| {
-        (
+    let note = state.db.create_note(&input).map_err(|e| match e {
+        crate::error::MarketError::NotFound(msg) => {
+            (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: msg }))
+        }
+        crate::error::MarketError::InvalidInput(msg) => {
+            (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: msg }))
+        }
+        _ => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 error: e.to_string(),
             }),
-        )
+        ),
     })?;
 
     Ok((StatusCode::CREATED, Json(note)))
@@ -497,13 +482,23 @@ async fn update_note(
     Path(id): Path<i64>,
     Json(input): Json<UpdateNoteInput>,
 ) -> Result<Json<StockNote>, (StatusCode, Json<ErrorResponse>)> {
-    let updated = state.db.update_note(id, &input).map_err(|e| {
-        (
+    if let Err(e) = input.validate(id) {
+        return Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })));
+    }
+
+    let updated = state.db.update_note(id, &input).map_err(|e| match e {
+        crate::error::MarketError::NotFound(msg) => {
+            (StatusCode::NOT_FOUND, Json(ErrorResponse { error: msg }))
+        }
+        crate::error::MarketError::InvalidInput(msg) => {
+            (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: msg }))
+        }
+        _ => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 error: e.to_string(),
             }),
-        )
+        ),
     })?;
 
     match updated {
