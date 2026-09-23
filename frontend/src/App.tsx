@@ -31,7 +31,7 @@ export const App: React.FC = () => {
       <LeftRail />
       <Sidebar />
 
-      <main className="main-viewport">
+      <main className="main-stage">
         <TopBar heroPrice={heroPrice} heroChange={heroChange} />
 
         <div className="viewport-area">
