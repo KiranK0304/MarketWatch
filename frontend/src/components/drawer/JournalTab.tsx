@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
 import type { StockNote } from '../../types';
@@ -19,17 +19,24 @@ export const JournalTab: React.FC = () => {
 
   const [notes, setNotes] = useState<StockNote[]>([]);
   const [loading, setLoading] = useState(false);
+  const requestGeneration = useRef(0);
 
   const fetchNotes = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     try {
       const sym = journalFilterScope === 'stock' ? activeStock?.symbol : undefined;
       const data = await api.getNotes(sym, journalFilterStatus);
+      if (generation !== requestGeneration.current) return;
       setNotes(data);
     } catch (err: any) {
-      showToast(`Failed to load journal: ${err.message}`);
+      if (generation === requestGeneration.current) {
+        showToast(`Failed to load journal: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) {
+        setLoading(false);
+      }
     }
   }, [activeStock?.symbol, journalFilterScope, journalFilterStatus, showToast]);
 
@@ -42,7 +49,7 @@ export const JournalTab: React.FC = () => {
     try {
       await api.deleteNote(id);
       showToast(`Note #${id} deleted`);
-      fetchNotes();
+      await fetchNotes();
     } catch (err: any) {
       showToast(`Failed to delete note: ${err.message}`);
     }
