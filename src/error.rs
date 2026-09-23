@@ -30,6 +30,10 @@ pub enum MarketError {
     Database(String),
     /// Invalid timeframe string.
     InvalidTimeframe(String),
+    /// Invalid input or validation failure.
+    InvalidInput(String),
+    /// Resource not found.
+    NotFound(String),
 }
 
 impl fmt::Display for MarketError {
@@ -54,6 +58,8 @@ impl fmt::Display for MarketError {
             MarketError::Config(msg) => write!(f, "Configuration error: {msg}"),
             MarketError::Database(msg) => write!(f, "Database error: {msg}"),
             MarketError::InvalidTimeframe(s) => write!(f, "Invalid timeframe: '{s}'"),
+            MarketError::InvalidInput(msg) => write!(f, "Invalid input: {msg}"),
+            MarketError::NotFound(msg) => write!(f, "Not found: {msg}"),
         }
     }
 }
