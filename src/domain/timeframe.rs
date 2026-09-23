@@ -52,6 +52,18 @@ impl Timeframe {
         }
     }
 
+    /// Number of seconds represented by one candle interval.
+    pub fn seconds(self) -> i64 {
+        match self {
+            Timeframe::Min5 => 5 * 60,
+            Timeframe::Min15 => 15 * 60,
+            Timeframe::Min30 => 30 * 60,
+            Timeframe::Hour1 => 60 * 60,
+            Timeframe::Day1 => 24 * 60 * 60,
+            Timeframe::Week1 => 7 * 24 * 60 * 60,
+        }
+    }
+
     /// Yahoo Finance API range parameter.
     /// Returns the maximum useful historical range for each interval.
     pub fn yahoo_range(self) -> &'static str {
@@ -150,5 +162,13 @@ mod tests {
         assert_eq!(Timeframe::Min5.yahoo_range(), "5d");
         assert_eq!(Timeframe::Day1.yahoo_range(), "2y");
         assert_eq!(Timeframe::Week1.yahoo_range(), "5y");
+    }
+
+    #[test]
+    fn interval_seconds() {
+        assert_eq!(Timeframe::Min5.seconds(), 300);
+        assert_eq!(Timeframe::Min15.seconds(), 900);
+        assert_eq!(Timeframe::Hour1.seconds(), 3600);
+        assert_eq!(Timeframe::Week1.seconds(), 604_800);
     }
 }

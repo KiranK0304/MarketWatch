@@ -171,28 +171,40 @@ impl CandleSyncService {
         // 2. Determine whether to perform full or incremental sync
         let meta = self.db.get_sync_meta(symbol, tf_label)?;
         let now_epoch = chrono::Utc::now().timestamp();
-
         let fetch_result = match meta {
             Some(ref m) if m.candle_count > 0 && !force => {
-                // Incremental fetch: query from the last stored candle up to now
-                // (Using last_candle_ts ensures any forming candle is updated in-place)
+                let gaps = self.db.detect_gaps(symbol, timeframe)?;
+                for (gap_start, gap_end) in gaps {
+                    let gap_end = gap_end.saturating_add(timeframe.seconds());
+                    let candles = self
+                        .provider
+                        .fetch_candles_range(symbol, timeframe, gap_start, gap_end)
+                        .await?;
+                    self.db
+                        .save_candles(symbol, tf_label, &candles, now_epoch)?;
+                }
+
+                // Incremental fetch: query from the last stored candle up to now.
+                // Using last_candle_ts also refreshes the forming candle in place.
                 self.provider
                     .fetch_candles_range(symbol, timeframe, m.last_candle_ts, now_epoch)
                     .await
             }
             _ => {
-                // Initial load or forced reload: fetch full standard window
+                // Initial load or forced reload: fetch full standard window.
                 self.provider.fetch_candles(symbol, timeframe).await
             }
         };
 
         match fetch_result {
             Ok(candles) => {
-                // Save candles into SQLite with upsert semantics
                 self.db
                     .save_candles(symbol, tf_label, &candles, now_epoch)?;
 
-                // Return full accumulated historical sequence from SQLite
+                let remaining_gaps = self.db.detect_gaps(symbol, timeframe)?;
+                self.db
+                    .mark_gap_detected(symbol, tf_label, !remaining_gaps.is_empty())?;
+
                 let all_candles = self.db.get_candles(symbol, tf_label)?;
                 let result_candles = if all_candles.is_empty() {
                     candles
