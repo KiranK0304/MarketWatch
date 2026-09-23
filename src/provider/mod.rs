@@ -4,9 +4,12 @@
 //! The application layer only depends on this trait, never on provider-specific types.
 
 pub mod cached;
+pub mod sync;
 pub mod yahoo;
 
 pub use cached::CachedProvider;
+#[allow(unused_imports)]
+pub use sync::{CandleSyncService, SyncStatus};
 
 use crate::domain::{Candle, Timeframe};
 use crate::error::MarketError;
