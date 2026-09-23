@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::{self, StockEntry};
 use crate::domain::{
     CreateNoteInput, MarketCalendar, ScanResult, StockMover, StockNote, Timeframe, UpdateNoteInput,
+    mover::validate_threshold, note::is_valid_status,
 };
 use crate::provider::CandleSyncService;
 use crate::provider::yahoo::YahooProvider;
@@ -61,6 +62,30 @@ pub struct ErrorResponse {
     pub error: String,
 }
 
+fn bad_request(msg: impl Into<String>) -> (StatusCode, Json<ErrorResponse>) {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(ErrorResponse { error: msg.into() }),
+    )
+}
+
+/// Validate a ticker symbol for universe membership (shared by add/delete paths).
+fn validate_universe_symbol(sym_upper: &str) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    if sym_upper.is_empty() {
+        return Err(bad_request("Stock symbol cannot be empty"));
+    }
+    if sym_upper.len() > 32
+        || !sym_upper
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '^' | '='))
+    {
+        return Err(bad_request(format!(
+            "Invalid symbol '{sym_upper}': use Yahoo ticker characters (letters, digits, . - ^ =), max 32 chars"
+        )));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 pub struct MarketStatus {
     pub is_open: bool,
@@ -69,7 +94,10 @@ pub struct MarketStatus {
 
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
-        (StatusCode::BAD_REQUEST, Json(self)).into_response()
+        // Fallback only: every handler must return an explicit status tuple.
+        // Defaulting to 500 (not 400) so a future bare `Err(ErrorResponse)`
+        // can never misreport a server failure as a client error.
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
     }
 }
 
@@ -106,7 +134,7 @@ async fn get_stocks(
 async fn add_stock(
     State(state): State<WebState>,
     Json(new_stock): Json<StockEntry>,
-) -> Result<Json<StockEntry>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<StockEntry>), (StatusCode, Json<ErrorResponse>)> {
     let original_config = config::load_stock_config(&state.config_path).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -118,19 +146,20 @@ async fn add_stock(
     let mut config = original_config.clone();
 
     let sym_upper = new_stock.symbol.trim().to_uppercase();
-    if sym_upper.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Stock symbol cannot be empty".to_string(),
-            }),
-        ));
-    }
+    validate_universe_symbol(&sym_upper)?;
     if new_stock.name.trim().is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
                 error: "Stock name cannot be empty".to_string(),
+            }),
+        ));
+    }
+    if new_stock.name.trim().chars().count() > 200 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Stock name is too long (max 200 characters)".to_string(),
             }),
         ));
     }
@@ -186,7 +215,7 @@ async fn add_stock(
         ));
     }
 
-    Ok(Json(added))
+    Ok((StatusCode::CREATED, Json(added)))
 }
 
 /// Remove a stock from the universe.
@@ -205,12 +234,14 @@ async fn delete_stock(
     let mut config = original_config.clone();
 
     let sym_upper = symbol.trim().to_uppercase();
+    validate_universe_symbol(&sym_upper)?;
     let initial_len = config.stocks.len();
-    config
+    let found = config
         .stocks
-        .retain(|s| s.symbol.to_uppercase() != sym_upper);
+        .iter()
+        .any(|s| s.symbol.to_uppercase() == sym_upper);
 
-    if config.stocks.len() == initial_len {
+    if !found {
         return Err((
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
@@ -219,7 +250,9 @@ async fn delete_stock(
         ));
     }
 
-    if config.stocks.is_empty() {
+    // The sole remaining stock cannot be removed (checked after existence so
+    // a typo never reports "cannot delete last" for a stock that isn't there).
+    if initial_len == 1 {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
@@ -227,6 +260,10 @@ async fn delete_stock(
             }),
         ));
     }
+
+    config
+        .stocks
+        .retain(|s| s.symbol.to_uppercase() != sym_upper);
 
     config::save_stock_config(&state.config_path, &config).map_err(|e| {
         (
@@ -261,6 +298,9 @@ async fn get_candles(
     State(state): State<WebState>,
     Query(params): Query<CandlesQuery>,
 ) -> Result<Response, (StatusCode, Json<ErrorResponse>)> {
+    if params.symbol.trim().is_empty() {
+        return Err(bad_request("Query parameter 'symbol' cannot be empty"));
+    }
     let timeframe: Timeframe = params
         .timeframe
         .parse()
@@ -316,6 +356,8 @@ async fn scan_movers(
     Query(params): Query<ScanQuery>,
 ) -> Result<Json<ScanResult>, (StatusCode, Json<ErrorResponse>)> {
     let threshold = params.threshold.unwrap_or(3.0);
+    let threshold = validate_threshold(threshold)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })))?;
     let force = params.force.unwrap_or(false);
 
     let state_path = ScanState::default_path();
@@ -324,8 +366,13 @@ async fn scan_movers(
     let now = chrono::Utc::now().timestamp();
     if !force
         && let Some(ref last) = scan_state.last_scan_result
-        // If scan is less than 3 minutes old, filter locally
-        && (now - last.timestamp).abs() < 180
+        // If scan is less than 3 minutes old, filter locally. Only past
+        // timestamps count: a future/corrupt timestamp must re-scan, not
+        // masquerade as fresh.
+        && {
+            let age = now - last.timestamp;
+            (0..180).contains(&age)
+        }
     {
         let mut movers: Vec<StockMover> = last
             .all_quotes
@@ -366,8 +413,18 @@ async fn scan_movers(
 
     let scanner = Scanner::new(state.provider.clone());
     let result = scanner.scan(&config.stocks, threshold).await.map_err(|e| {
+        // Invalid thresholds are rejected above; a total provider failure is
+        // a gateway problem, not a client error.
+        let status = match e {
+            crate::error::MarketError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+            crate::error::MarketError::NoData { .. } => StatusCode::NOT_FOUND,
+            crate::error::MarketError::Provider { .. } | crate::error::MarketError::Network(_) => {
+                StatusCode::BAD_GATEWAY
+            }
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
         (
-            StatusCode::INTERNAL_SERVER_ERROR,
+            status,
             Json(ErrorResponse {
                 error: e.to_string(),
             }),
@@ -392,6 +449,8 @@ async fn get_scan_cached(
     Query(params): Query<ScanQuery>,
 ) -> Result<Json<Option<ScanResult>>, (StatusCode, Json<ErrorResponse>)> {
     let threshold = params.threshold.unwrap_or(3.0);
+    let threshold = validate_threshold(threshold)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })))?;
     let state_path = ScanState::default_path();
     let scan_state = ScanState::load(&state_path);
 
@@ -442,9 +501,19 @@ async fn get_cache_meta(
     State(state): State<WebState>,
     Query(params): Query<CandlesQuery>,
 ) -> Result<Json<Option<CacheSyncMeta>>, (StatusCode, Json<ErrorResponse>)> {
+    // Normalize exactly like the sync service's storage keys and validate
+    // the timeframe (an unknown timeframe is a 400, not a silent null).
+    let symbol = params.symbol.trim().to_uppercase();
+    if symbol.is_empty() {
+        return Err(bad_request("Query parameter 'symbol' cannot be empty"));
+    }
+    let timeframe: Timeframe = params
+        .timeframe
+        .parse()
+        .map_err(|e: String| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })))?;
     let meta = state
         .db
-        .get_sync_meta(&params.symbol, &params.timeframe)
+        .get_sync_meta(&symbol, timeframe.label())
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -462,6 +531,14 @@ async fn list_notes(
     State(state): State<WebState>,
     Query(query): Query<NotesQuery>,
 ) -> Result<Json<Vec<StockNote>>, (StatusCode, Json<ErrorResponse>)> {
+    if let Some(ref status) = query.status
+        && status != "all"
+        && !is_valid_status(status)
+    {
+        return Err(bad_request(format!(
+            "Invalid status filter '{status}': must be one of open, validated, invalidated, cancelled, all"
+        )));
+    }
     let notes = state
         .db
         .list_notes(query.symbol.as_deref(), query.status.as_deref())
@@ -639,10 +716,9 @@ pub async fn start_server(
     println!("║       MarketWatch Web Dashboard is Running!                  ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  URL:      {:<49} ║", url);
-    println!("║  Theme:    White (Default) / Black (Toggle with 'T')        ║");
+    println!("║  Controls: ↑/↓ stocks | 1-6 timeframes | Space sync | ? help  ║");
     println!("║  Features: Top 150 Universe | Movers Screener (1%,2%,3%)    ║");
     println!("║            Multi-Chart Grid | 09:30 & 15:30 Cron Catch-up   ║");
-    println!("║  Controls: Use ↑/↓ to flip stocks | 1-6 timeframes | R reload║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     if open_browser {

@@ -207,17 +207,29 @@ class AuthProxyHandler(BaseHTTPRequestHandler):
         req = urllib.request.Request(url, data=body, headers=req_headers, method=self.command)
 
         try:
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 self.send_response(resp.status)
                 for k, v in resp.getheaders():
-                    if k.lower() not in ["transfer-encoding", "content-encoding"]:
+                    if k.lower() not in [
+                        "transfer-encoding",
+                        "content-encoding",
+                        "content-length",
+                        "connection",
+                        "keep-alive",
+                    ]:
                         self.send_header(k, v)
                 self.end_headers()
                 self.wfile.write(resp.read())
         except urllib.error.HTTPError as e:
             self.send_response(e.code)
             for k, v in e.headers.items():
-                if k.lower() not in ["transfer-encoding", "content-encoding"]:
+                if k.lower() not in [
+                    "transfer-encoding",
+                    "content-encoding",
+                    "content-length",
+                    "connection",
+                    "keep-alive",
+                ]:
                     self.send_header(k, v)
             self.end_headers()
             self.wfile.write(e.read())
@@ -228,7 +240,10 @@ class AuthProxyHandler(BaseHTTPRequestHandler):
             self.wfile.write(f'{{"error": "Backend gateway error: {e}"}}'.encode("utf-8"))
 
     def handle_auth(self):
-        if self.path == "/_login" and self.command == "POST":
+        # Strip query strings before routing so /_login?x=1 still logs in
+        # instead of being forwarded to the backend behind the auth gate.
+        path_only = self.path.split("?", 1)[0]
+        if path_only == "/_login" and self.command == "POST":
             self.do_login_post()
             return
 
@@ -250,6 +265,7 @@ class AuthProxyHandler(BaseHTTPRequestHandler):
     def do_HEAD(self): self.handle_auth()
     def do_OPTIONS(self): self.handle_auth()
     def do_PUT(self): self.handle_auth()
+    def do_PATCH(self): self.handle_auth()
 
     def log_message(self, format, *args):
         # Filter noisy log lines, keep important hits
@@ -261,7 +277,9 @@ if __name__ == "__main__":
     print("  MarketWatch Password-Protected Auth Proxy")
     print(f"  Target:     {TARGET_HOST}")
     print(f"  Listening:  http://127.0.0.1:{PROXY_PORT}")
-    print(f"  Passphrase: {PASSWORD}")
+    # Never print the passphrase: it leaks into shell history, logs, and
+    # process supervisors. It was provided via MW_PASSWORD/argv already.
+    print("  Passphrase: [set via MW_PASSWORD or argv — not echoed]")
     print("=" * 60)
     sys.stdout.flush()
     try:
