@@ -1795,6 +1795,7 @@
     let journalFilterScope = 'stock'; // 'stock' | 'all'
     let journalFilterStatus = 'all'; // 'all' | 'open' | 'validated' | 'invalidated'
     let journalRenderGen = 0;
+    let drawerRenderGen = 0;
     let chartRequestGen = 0;
 
     // Elements
@@ -2573,6 +2574,7 @@
 
     // Right Drawer Content (AI Insights, Fundamentals, System Commands)
     async function renderDrawerTab(tabKey) {
+      const renderGen = ++drawerRenderGen;
       currentDrawerTab = tabKey;
       document.querySelectorAll('.drawer-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.tab === tabKey);
@@ -2716,6 +2718,7 @@
         let barCountStr = '0';
         try {
           const res = await fetch(`/api/cache/meta?symbol=${encodeURIComponent(stock.symbol)}&timeframe=${currentTimeframe}`);
+          if (renderGen !== drawerRenderGen || currentDrawerTab !== tabKey) return;
           if (res.ok) {
             const meta = await res.json();
             if (meta) {
