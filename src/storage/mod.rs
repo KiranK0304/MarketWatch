@@ -3,7 +3,7 @@
 //! Provides fast in-process querying (< 0.2ms) and market-aware cache freshness checks
 //! for Indian Stock Exchanges (NSE/BSE, UTC+5:30).
 
-use chrono::{DateTime, Datelike, FixedOffset, Timelike, Utc};
+use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -32,6 +32,8 @@ pub struct CacheSyncMeta {
     pub first_candle_ts: i64,
     pub last_candle_ts: i64,
     pub candle_count: usize,
+    pub last_verified_at: i64,
+    pub is_gap_detected: bool,
 }
 
 /// SQLite database handle for caching OHLCV candles.
@@ -84,6 +86,12 @@ impl MarketDb {
                 exchange    TEXT NOT NULL DEFAULT 'NSE',
                 is_active   INTEGER NOT NULL DEFAULT 1,
                 created_at  INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS market_holidays (
+                holiday_date        TEXT PRIMARY KEY NOT NULL,
+                description         TEXT NOT NULL,
+                is_trading_holiday  INTEGER NOT NULL DEFAULT 1
             );",
         )?;
 
@@ -147,17 +155,36 @@ impl MarketDb {
                          first_candle_ts INTEGER NOT NULL,
                          last_candle_ts  INTEGER NOT NULL,
                          candle_count    INTEGER NOT NULL,
+                         last_verified_at INTEGER DEFAULT 0,
+                         is_gap_detected INTEGER DEFAULT 0,
                          PRIMARY KEY (symbol, timeframe),
                          FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
                      );
 
-                     INSERT INTO cache_sync_meta_new SELECT * FROM cache_sync_meta;
+                     INSERT INTO cache_sync_meta_new SELECT symbol, timeframe, last_synced_at, first_candle_ts, last_candle_ts, candle_count, 0, 0 FROM cache_sync_meta;
                      DROP TABLE cache_sync_meta;
                      ALTER TABLE cache_sync_meta_new RENAME TO cache_sync_meta;
 
                      COMMIT;
                      PRAGMA foreign_keys = ON;",
                 )?;
+            } else {
+                // Table already has foreign keys. Ensure columns last_verified_at and is_gap_detected exist
+                let mut stmt = conn.prepare("PRAGMA table_info(cache_sync_meta)")?;
+                let columns: std::collections::HashSet<String> = stmt
+                    .query_map([], |row| row.get::<_, String>(1))?
+                    .filter_map(|r| r.ok())
+                    .collect();
+
+                if !columns.contains("last_verified_at") {
+                    let _ = conn.execute("ALTER TABLE cache_sync_meta ADD COLUMN last_verified_at INTEGER DEFAULT 0;", []);
+                }
+                if !columns.contains("is_gap_detected") {
+                    let _ = conn.execute(
+                        "ALTER TABLE cache_sync_meta ADD COLUMN is_gap_detected INTEGER DEFAULT 0;",
+                        [],
+                    );
+                }
             }
         } else {
             // Fresh database setup with foreign keys defined upfront
@@ -185,6 +212,8 @@ impl MarketDb {
                     first_candle_ts INTEGER NOT NULL,
                     last_candle_ts  INTEGER NOT NULL,
                     candle_count    INTEGER NOT NULL,
+                    last_verified_at INTEGER DEFAULT 0,
+                    is_gap_detected INTEGER DEFAULT 0,
                     PRIMARY KEY (symbol, timeframe),
                     FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
                 );",
@@ -313,14 +342,16 @@ impl MarketDb {
 
         // Update metadata
         tx.execute(
-            "INSERT INTO cache_sync_meta (symbol, timeframe, last_synced_at, first_candle_ts, last_candle_ts, candle_count)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "INSERT INTO cache_sync_meta (symbol, timeframe, last_synced_at, first_candle_ts, last_candle_ts, candle_count, last_verified_at, is_gap_detected)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)
              ON CONFLICT(symbol, timeframe) DO UPDATE SET
                 last_synced_at = excluded.last_synced_at,
                 first_candle_ts = excluded.first_candle_ts,
                 last_candle_ts = excluded.last_candle_ts,
-                candle_count = excluded.candle_count",
-            params![symbol, timeframe, synced_at, first_ts, last_ts, count],
+                candle_count = excluded.candle_count,
+                last_verified_at = excluded.last_verified_at,
+                is_gap_detected = 0",
+            params![symbol, timeframe, synced_at, first_ts, last_ts, count, synced_at],
         )?;
 
         tx.commit()?;
@@ -338,13 +369,15 @@ impl MarketDb {
             .lock()
             .map_err(|e| MarketError::Database(e.to_string()))?;
         let mut stmt = conn.prepare_cached(
-            "SELECT last_synced_at, first_candle_ts, last_candle_ts, candle_count 
+            "SELECT last_synced_at, first_candle_ts, last_candle_ts, candle_count,
+                    COALESCE(last_verified_at, 0), COALESCE(is_gap_detected, 0) 
              FROM cache_sync_meta 
              WHERE symbol = ?1 AND timeframe = ?2",
         )?;
 
         let mut rows = stmt.query(params![symbol, timeframe])?;
         if let Some(row) = rows.next()? {
+            let is_gap_int: i64 = row.get(5)?;
             Ok(Some(CacheSyncMeta {
                 symbol: symbol.to_string(),
                 timeframe: timeframe.to_string(),
@@ -352,21 +385,204 @@ impl MarketDb {
                 first_candle_ts: row.get(1)?,
                 last_candle_ts: row.get(2)?,
                 candle_count: row.get(3)?,
+                last_verified_at: row.get(4)?,
+                is_gap_detected: is_gap_int != 0,
             }))
         } else {
             Ok(None)
         }
     }
 
-    /// Smart check if the cached data is fresh enough to skip external API calls.
+    /// Retrieve candles within a specific timestamp range in ascending order.
+    #[allow(dead_code)]
+    pub fn get_candles_range(
+        &self,
+        symbol: &str,
+        timeframe: &str,
+        start_ts: i64,
+        end_ts: i64,
+    ) -> Result<Vec<Candle>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT timestamp, open, high, low, close, volume 
+             FROM candles 
+             WHERE symbol = ?1 AND timeframe = ?2 AND timestamp >= ?3 AND timestamp <= ?4
+             ORDER BY timestamp ASC",
+        )?;
+
+        let candle_iter = stmt.query_map(params![symbol, timeframe, start_ts, end_ts], |row| {
+            let ts: i64 = row.get(0)?;
+            let open: f64 = row.get(1)?;
+            let high: f64 = row.get(2)?;
+            let low: f64 = row.get(3)?;
+            let close: f64 = row.get(4)?;
+            let volume: u64 = row.get(5)?;
+
+            let datetime = DateTime::from_timestamp(ts, 0).unwrap_or_default();
+
+            Ok(Candle {
+                timestamp: ts,
+                datetime,
+                open,
+                high,
+                low,
+                close,
+                volume,
+            })
+        })?;
+
+        let mut candles = Vec::new();
+        for candle in candle_iter {
+            candles.push(candle?);
+        }
+
+        Ok(candles)
+    }
+
+    /// Retrieve the single most recent candle for a given symbol and timeframe.
+    #[allow(dead_code)]
+    pub fn get_latest_candle(
+        &self,
+        symbol: &str,
+        timeframe: &str,
+    ) -> Result<Option<Candle>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT timestamp, open, high, low, close, volume 
+             FROM candles 
+             WHERE symbol = ?1 AND timeframe = ?2 
+             ORDER BY timestamp DESC LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query(params![symbol, timeframe])?;
+        if let Some(row) = rows.next()? {
+            let ts: i64 = row.get(0)?;
+            let open: f64 = row.get(1)?;
+            let high: f64 = row.get(2)?;
+            let low: f64 = row.get(3)?;
+            let close: f64 = row.get(4)?;
+            let volume: u64 = row.get(5)?;
+
+            let datetime = DateTime::from_timestamp(ts, 0).unwrap_or_default();
+
+            Ok(Some(Candle {
+                timestamp: ts,
+                datetime,
+                open,
+                high,
+                low,
+                close,
+                volume,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Retrieve all stored candle timestamps in ascending order for gap checking.
+    pub fn get_all_stored_timestamps(
+        &self,
+        symbol: &str,
+        timeframe: &str,
+    ) -> Result<Vec<i64>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT timestamp 
+             FROM candles 
+             WHERE symbol = ?1 AND timeframe = ?2 
+             ORDER BY timestamp ASC",
+        )?;
+
+        let rows = stmt.query_map(params![symbol, timeframe], |row| row.get(0))?;
+        let mut timestamps = Vec::new();
+        for ts in rows {
+            timestamps.push(ts?);
+        }
+        Ok(timestamps)
+    }
+
+    /// Detect missing internal candle ranges for a given symbol and timeframe.
     ///
-    /// Rules:
-    /// 1. If no cache or 0 candles exist -> Stale (false).
-    /// 2. If market is currently closed (Weekend, before 09:15 IST, or after 15:30 IST):
-    ///    - If `last_synced_at` >= the most recent market close timestamp -> 100% Fresh (true).
-    /// 3. If market is currently open (09:15 to 15:30 IST on a weekday):
-    ///    - If `now - last_synced_at` <= `ttl_secs` -> Fresh (true).
-    ///    - Otherwise -> Stale (false).
+    /// Compares stored timestamps in SQLite with the expected schedule from `MarketCalendar`.
+    /// Returns contiguous missing timestamp ranges `(gap_start, gap_end)`.
+    pub fn detect_gaps(
+        &self,
+        symbol: &str,
+        timeframe: crate::domain::Timeframe,
+    ) -> Result<Vec<(i64, i64)>, MarketError> {
+        let tf_label = timeframe.label();
+        let meta = match self.get_sync_meta(symbol, tf_label)? {
+            Some(m) if m.candle_count >= 2 => m,
+            _ => return Ok(Vec::new()),
+        };
+
+        let expected_slots = crate::domain::calendar::MarketCalendar::expected_slots_between(
+            meta.first_candle_ts,
+            meta.last_candle_ts,
+            timeframe,
+        );
+
+        if expected_slots.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let stored_ts = self.get_all_stored_timestamps(symbol, tf_label)?;
+        let stored_set: std::collections::HashSet<i64> = stored_ts.into_iter().collect();
+
+        let mut gaps = Vec::new();
+        let mut current_gap: Option<(i64, i64)> = None;
+
+        for slot in expected_slots {
+            if !stored_set.contains(&slot) {
+                match current_gap {
+                    Some((start, _)) => current_gap = Some((start, slot)),
+                    None => current_gap = Some((slot, slot)),
+                }
+            } else if let Some((start, end)) = current_gap.take() {
+                gaps.push((start, end));
+            }
+        }
+
+        if let Some((start, end)) = current_gap {
+            gaps.push((start, end));
+        }
+
+        Ok(gaps)
+    }
+
+    /// Mark whether a gap was detected for a symbol and timeframe in sync metadata.
+    #[allow(dead_code)]
+    pub fn mark_gap_detected(
+        &self,
+        symbol: &str,
+        timeframe: &str,
+        is_gap: bool,
+    ) -> Result<(), MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        conn.execute(
+            "UPDATE cache_sync_meta SET is_gap_detected = ?1 WHERE symbol = ?2 AND timeframe = ?3",
+            params![if is_gap { 1 } else { 0 }, symbol, timeframe],
+        )?;
+        Ok(())
+    }
+
+    /// Robust, gap-aware check if the cached data is fresh enough to skip external API calls.
+    ///
+    /// Verifies that:
+    /// 1. Stored data reaches the latest expected market candle for the trading calendar.
+    /// 2. If the current candle is actively forming, checks that its age is within `ttl_secs`.
     pub fn is_fresh(
         &self,
         symbol: &str,
@@ -378,36 +594,31 @@ impl MarketDb {
             _ => return Ok(false),
         };
 
-        let ist_offset = FixedOffset::east_opt(5 * 3600 + 30 * 60)
-            .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
-        let now_ist = Utc::now().with_timezone(&ist_offset);
-        let now_epoch = Utc::now().timestamp();
+        let tf: crate::domain::Timeframe = match timeframe.parse() {
+            Ok(t) => t,
+            Err(_) => return Ok(false),
+        };
 
-        let is_trading_day = matches!(
-            now_ist.weekday(),
-            chrono::Weekday::Mon
-                | chrono::Weekday::Tue
-                | chrono::Weekday::Wed
-                | chrono::Weekday::Thu
-                | chrono::Weekday::Fri
-        );
-
-        let current_minutes = now_ist.hour() * 60 + now_ist.minute();
-        const OPEN_MINUTES: u32 = 9 * 60 + 15; // 09:15 AM IST
-        const CLOSE_MINUTES: u32 = 15 * 60 + 30; // 03:30 PM IST
-
-        let is_market_open =
-            is_trading_day && (OPEN_MINUTES..CLOSE_MINUTES).contains(&current_minutes);
-
-        if is_market_open {
-            // During market hours, check TTL window
-            let elapsed = now_epoch - meta.last_synced_at;
-            Ok(elapsed <= ttl_secs)
-        } else {
-            // Market is closed. Find the epoch timestamp of the most recent market close (15:30 IST)
-            let last_close_epoch = get_last_market_close_epoch(now_ist);
-            Ok(meta.last_synced_at >= last_close_epoch)
+        if meta.is_gap_detected {
+            return Ok(false);
         }
+
+        let now_ist = crate::domain::calendar::now_ist();
+        let expected = crate::domain::calendar::MarketCalendar::latest_expected_candle(now_ist, tf);
+
+        // If the latest stored candle hasn't even reached the expected latest slot, it's stale!
+        if meta.last_candle_ts < expected.timestamp {
+            return Ok(false);
+        }
+
+        // If the latest expected candle is currently forming in live market:
+        if expected.is_forming {
+            let elapsed = chrono::Utc::now().timestamp() - meta.last_synced_at;
+            return Ok(elapsed <= ttl_secs);
+        }
+
+        // Market closed and data reaches the final closed slot: 100% fresh!
+        Ok(true)
     }
 
     /// Upsert a ticker into the primary tickers table.
@@ -526,45 +737,6 @@ impl MarketDb {
     }
 }
 
-/// Calculate the Unix epoch timestamp for the most recent market close (15:30 IST).
-fn get_last_market_close_epoch(now_ist: DateTime<FixedOffset>) -> i64 {
-    let weekday = now_ist.weekday();
-    let current_minutes = now_ist.hour() * 60 + now_ist.minute();
-    const CLOSE_MINUTES: u32 = 15 * 60 + 30;
-
-    // How many days back was the last trading day's close?
-    let days_back = match weekday {
-        chrono::Weekday::Mon => {
-            if current_minutes >= CLOSE_MINUTES {
-                0
-            } else {
-                3 // Previous Friday
-            }
-        }
-        chrono::Weekday::Sat => 1, // Friday
-        chrono::Weekday::Sun => 2, // Friday
-        _ => {
-            // Tue, Wed, Thu, Fri
-            if current_minutes >= CLOSE_MINUTES {
-                0 // Today at 15:30
-            } else {
-                1 // Yesterday at 15:30
-            }
-        }
-    };
-
-    let target_date = now_ist.date_naive() - chrono::Duration::days(days_back);
-    let target_close = target_date
-        .and_hms_opt(15, 30, 0)
-        .expect("Valid 15:30 time");
-
-    let ist_offset = *now_ist.offset();
-    let close_datetime =
-        DateTime::<FixedOffset>::from_naive_utc_and_offset(target_close - ist_offset, ist_offset);
-
-    close_datetime.timestamp()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -646,7 +818,8 @@ mod tests {
             make_test_candle(1000, 2500.0, 2520.0),
             make_test_candle(2000, 2520.0, 2550.0),
         ];
-        db.save_candles("RELIANCE.NS", "15m", &candles, 2500).unwrap();
+        db.save_candles("RELIANCE.NS", "15m", &candles, 2500)
+            .unwrap();
 
         assert_eq!(db.get_candles("RELIANCE.NS", "15m").unwrap().len(), 2);
         assert!(db.get_sync_meta("RELIANCE.NS", "15m").unwrap().is_some());
@@ -729,12 +902,84 @@ mod tests {
         assert_eq!(candles.len(), 1);
         assert_eq!(candles[0].close, 405.0);
 
-        let meta = db.get_sync_meta("WIPRO.NS", "1d").unwrap().expect("meta preserved");
+        let meta = db
+            .get_sync_meta("WIPRO.NS", "1d")
+            .unwrap()
+            .expect("meta preserved");
         assert_eq!(meta.candle_count, 1);
 
         // Check that cascade delete now works on migrated table
         db.delete_ticker("WIPRO.NS").unwrap();
         assert_eq!(db.get_candles("WIPRO.NS", "1d").unwrap().len(), 0);
         assert!(db.get_sync_meta("WIPRO.NS", "1d").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_is_fresh_scenarios() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let now_ist = crate::domain::calendar::now_ist();
+        let expected = crate::domain::calendar::MarketCalendar::latest_expected_candle(
+            now_ist,
+            crate::domain::Timeframe::Min15,
+        );
+        let now_epoch = chrono::Utc::now().timestamp();
+
+        // 1. Missing latest candle: stored timestamp is strictly older than expected
+        let old_ts = expected.timestamp - 3600;
+        let c_old = make_test_candle(old_ts, 100.0, 101.0);
+        db.save_candles("TEST.NS", "15m", &[c_old], now_epoch)
+            .unwrap();
+        assert!(
+            !db.is_fresh("TEST.NS", "15m", 300).unwrap(),
+            "Older candle must not be fresh"
+        );
+
+        // 2. Complete coverage: stored candle reaches expected timestamp
+        let c_curr = make_test_candle(expected.timestamp, 101.0, 102.0);
+        db.save_candles("TEST.NS", "15m", std::slice::from_ref(&c_curr), now_epoch)
+            .unwrap();
+
+        if expected.is_forming {
+            // Fresh when recently synced
+            assert!(
+                db.is_fresh("TEST.NS", "15m", 300).unwrap(),
+                "Forming candle within TTL is fresh"
+            );
+
+            // Stale when synced long ago
+            let old_sync_time = now_epoch - 600;
+            db.save_candles(
+                "TEST.NS",
+                "15m",
+                std::slice::from_ref(&c_curr),
+                old_sync_time,
+            )
+            .unwrap();
+            assert!(
+                !db.is_fresh("TEST.NS", "15m", 300).unwrap(),
+                "Forming candle beyond TTL is stale"
+            );
+        } else {
+            // Market closed: 100% fresh regardless of last_synced_at
+            let old_sync_time = now_epoch - 86400;
+            db.save_candles(
+                "TEST.NS",
+                "15m",
+                std::slice::from_ref(&c_curr),
+                old_sync_time,
+            )
+            .unwrap();
+            assert!(
+                db.is_fresh("TEST.NS", "15m", 300).unwrap(),
+                "Market closed with complete coverage is fresh"
+            );
+        }
+
+        // 3. Gap detected: even if coverage seems complete, a detected gap makes it stale
+        db.mark_gap_detected("TEST.NS", "15m", true).unwrap();
+        assert!(
+            !db.is_fresh("TEST.NS", "15m", 300).unwrap(),
+            "Gap detected must make cache stale"
+        );
     }
 }
