@@ -196,7 +196,9 @@ pub async fn run_daemon(threshold: f64) -> anyhow::Result<()> {
                     );
                     let today_str = ist_now.format("%Y-%m-%d").to_string();
                     state.record_slot_completion(slot, &today_str, result.clone());
-                    let _ = state.save(&state_path);
+                    if let Err(e) = state.save(&state_path) {
+                        eprintln!("Scan completed but state persistence failed: {e}");
+                    }
                     send_desktop_notification(&result, Some(slot.label()));
                 }
                 Err(e) => {

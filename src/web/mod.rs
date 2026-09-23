@@ -375,7 +375,14 @@ async fn scan_movers(
     })?;
 
     scan_state.last_scan_result = Some(result.clone());
-    let _ = scan_state.save(&state_path);
+    scan_state.save(&state_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
 
     Ok(Json(result))
 }
