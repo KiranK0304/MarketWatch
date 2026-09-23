@@ -12,6 +12,7 @@ import type {
   StockNote,
   Timeframe,
   ViewMode,
+  Candle,
 } from '../types';
 import { api } from '../api/client';
 
@@ -78,6 +79,8 @@ interface AppContextValue {
   latestPrice: number;
   latestCandleTimestamp: number | null;
   setLatestCandleInfo: (price: number, ts: number | null) => void;
+  candles: Candle[];
+  setCandles: (candles: Candle[]) => void;
 
   // Modals
   isNoteModalOpen: boolean;
@@ -147,6 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [chartCacheHeader, setChartCacheHeader] = useState<string>('UNKNOWN');
   const [latestPrice, setLatestPrice] = useState<number>(0);
   const [latestCandleTimestamp, setLatestCandleTimestamp] = useState<number | null>(null);
+  const [candles, setCandles] = useState<Candle[]>([]);
 
   const setLatestCandleInfo = useCallback((price: number, ts: number | null) => {
     setLatestPrice(price);
@@ -263,6 +267,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteStock = useCallback(
     async (symbol: string) => {
+      if (!window.confirm(`Remove ${symbol} from universe?`)) return;
       try {
         await api.deleteStock(symbol);
         showToast(`Removed ${symbol}`);
@@ -389,6 +394,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     latestPrice,
     latestCandleTimestamp,
     setLatestCandleInfo,
+    candles,
+    setCandles,
 
     isNoteModalOpen,
     editingNote,

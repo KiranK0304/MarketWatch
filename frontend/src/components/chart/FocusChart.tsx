@@ -19,6 +19,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     toggleDrawer,
     setDrawerTab,
     setLatestCandleInfo,
+    setCandles,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -157,6 +158,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
         setCacheLatency(`${latency}ms (${cacheHeader})`);
         setChartCacheHeader(cacheHeader);
         setCandleData(candles);
+        setCandles(candles);
 
         if (candles.length > 0) {
           const formattedCandles: CandlestickData[] = candles.map(c => ({
