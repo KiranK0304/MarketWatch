@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::Candle;
+use crate::domain::{Candle, CreateNoteInput, StockNote, UpdateNoteInput};
 use crate::error::MarketError;
 
 /// A tracked stock ticker entry in the primary SQLite registry.
@@ -219,6 +219,34 @@ impl MarketDb {
                 );",
             )?;
         }
+
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS stock_notes (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol              TEXT    NOT NULL,
+                timeframe           TEXT    NOT NULL DEFAULT '15m',
+                candle_timestamp    INTEGER,
+                price_at_note       REAL    NOT NULL,
+                title               TEXT    NOT NULL,
+                content             TEXT    NOT NULL,
+                tags                TEXT    DEFAULT '',
+                status              TEXT    NOT NULL DEFAULT 'open',
+                target_price        REAL,
+                stop_loss           REAL,
+                outcome_note        TEXT,
+                verified_at         INTEGER,
+                reference_note_ids  TEXT    DEFAULT '[]',
+                created_at          INTEGER NOT NULL,
+                updated_at          INTEGER NOT NULL,
+                FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_stock_notes_symbol 
+            ON stock_notes (symbol, created_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_stock_notes_status 
+            ON stock_notes (status);",
+        )?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -735,6 +763,254 @@ impl MarketDb {
         let affected = conn.execute("DELETE FROM tickers WHERE symbol = ?1", params![symbol])?;
         Ok(affected > 0)
     }
+
+    /// Create a new stock analysis note.
+    pub fn create_note(&self, input: &CreateNoteInput) -> Result<StockNote, MarketError> {
+        let sym_upper = input.symbol.trim().to_uppercase();
+        let now = Utc::now().timestamp();
+        let ref_json =
+            serde_json::to_string(&input.reference_note_ids).unwrap_or_else(|_| "[]".to_string());
+
+        // Ensure symbol exists in tickers table to satisfy foreign key constraint
+        let _ = self.upsert_ticker(&Ticker {
+            symbol: sym_upper.clone(),
+            name: sym_upper.clone(),
+            exchange: "NSE".to_string(),
+            is_active: true,
+            created_at: now,
+        });
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+
+        conn.execute(
+            "INSERT INTO stock_notes (
+                symbol, timeframe, candle_timestamp, price_at_note, title, content,
+                tags, status, target_price, stop_loss, outcome_note, verified_at,
+                reference_note_ids, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'open', ?8, ?9, NULL, NULL, ?10, ?11, ?11)",
+            params![
+                sym_upper,
+                input.timeframe,
+                input.candle_timestamp,
+                input.price_at_note,
+                input.title.trim(),
+                input.content.trim(),
+                input.tags.trim(),
+                input.target_price,
+                input.stop_loss,
+                ref_json,
+                now,
+            ],
+        )?;
+
+        let id = conn.last_insert_rowid();
+
+        Ok(StockNote {
+            id,
+            symbol: sym_upper,
+            timeframe: input.timeframe.clone(),
+            candle_timestamp: input.candle_timestamp,
+            price_at_note: input.price_at_note,
+            title: input.title.trim().to_string(),
+            content: input.content.trim().to_string(),
+            tags: input.tags.trim().to_string(),
+            status: "open".to_string(),
+            target_price: input.target_price,
+            stop_loss: input.stop_loss,
+            outcome_note: None,
+            verified_at: None,
+            reference_note_ids: input.reference_note_ids.clone(),
+            created_at: now,
+            updated_at: now,
+        })
+    }
+
+    /// Retrieve a single stock analysis note by ID.
+    pub fn get_note(&self, id: i64) -> Result<Option<StockNote>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, symbol, timeframe, candle_timestamp, price_at_note, title, content,
+                    tags, status, target_price, stop_loss, outcome_note, verified_at,
+                    reference_note_ids, created_at, updated_at
+             FROM stock_notes
+             WHERE id = ?1",
+        )?;
+
+        let mut rows = stmt.query(params![id])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(map_note_row(row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List stock analysis notes with optional symbol and status filters.
+    pub fn list_notes(
+        &self,
+        symbol: Option<&str>,
+        status: Option<&str>,
+    ) -> Result<Vec<StockNote>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+
+        let mut sql =
+            "SELECT id, symbol, timeframe, candle_timestamp, price_at_note, title, content,
+                              tags, status, target_price, stop_loss, outcome_note, verified_at,
+                              reference_note_ids, created_at, updated_at
+                       FROM stock_notes WHERE 1=1"
+                .to_string();
+
+        let sym_upper = symbol.map(|s| s.trim().to_uppercase());
+        if sym_upper.is_some() {
+            sql.push_str(" AND symbol = ?1");
+        }
+        if status.is_some() {
+            if sym_upper.is_some() {
+                sql.push_str(" AND status = ?2");
+            } else {
+                sql.push_str(" AND status = ?1");
+            }
+        }
+        sql.push_str(" ORDER BY created_at DESC, id DESC");
+
+        let mut stmt = conn.prepare(&sql)?;
+
+        let note_iter = match (&sym_upper, &status) {
+            (Some(sym), Some(st)) => stmt.query_map(params![sym, st], map_note_row)?,
+            (Some(sym), None) => stmt.query_map(params![sym], map_note_row)?,
+            (None, Some(st)) => stmt.query_map(params![st], map_note_row)?,
+            (None, None) => stmt.query_map([], map_note_row)?,
+        };
+
+        let mut notes = Vec::new();
+        for n in note_iter {
+            notes.push(n?);
+        }
+        Ok(notes)
+    }
+
+    /// Update an existing stock analysis note.
+    pub fn update_note(
+        &self,
+        id: i64,
+        input: &UpdateNoteInput,
+    ) -> Result<Option<StockNote>, MarketError> {
+        let existing = match self.get_note(id)? {
+            Some(n) => n,
+            None => return Ok(None),
+        };
+
+        let updated_title = input.title.as_deref().unwrap_or(&existing.title).trim();
+        let updated_content = input.content.as_deref().unwrap_or(&existing.content).trim();
+        let updated_tags = input.tags.as_deref().unwrap_or(&existing.tags).trim();
+        let updated_status = input.status.as_deref().unwrap_or(&existing.status).trim();
+        let updated_target = input.target_price.or(existing.target_price);
+        let updated_stop = input.stop_loss.or(existing.stop_loss);
+        let updated_outcome = input.outcome_note.clone().or(existing.outcome_note);
+        let updated_verified = input.verified_at.or(existing.verified_at);
+        let updated_refs = input
+            .reference_note_ids
+            .as_ref()
+            .unwrap_or(&existing.reference_note_ids);
+        let ref_json = serde_json::to_string(updated_refs).unwrap_or_else(|_| "[]".to_string());
+        let now = Utc::now().timestamp();
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+
+        conn.execute(
+            "UPDATE stock_notes SET
+                title = ?1,
+                content = ?2,
+                tags = ?3,
+                status = ?4,
+                target_price = ?5,
+                stop_loss = ?6,
+                outcome_note = ?7,
+                verified_at = ?8,
+                reference_note_ids = ?9,
+                updated_at = ?10
+             WHERE id = ?11",
+            params![
+                updated_title,
+                updated_content,
+                updated_tags,
+                updated_status,
+                updated_target,
+                updated_stop,
+                updated_outcome,
+                updated_verified,
+                ref_json,
+                now,
+                id,
+            ],
+        )?;
+
+        drop(conn);
+        self.get_note(id)
+    }
+
+    /// Delete a stock analysis note by ID.
+    pub fn delete_note(&self, id: i64) -> Result<bool, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+
+        let affected = conn.execute("DELETE FROM stock_notes WHERE id = ?1", params![id])?;
+        Ok(affected > 0)
+    }
+}
+
+fn map_note_row(row: &rusqlite::Row) -> rusqlite::Result<StockNote> {
+    let id: i64 = row.get(0)?;
+    let symbol: String = row.get(1)?;
+    let timeframe: String = row.get(2)?;
+    let candle_timestamp: Option<i64> = row.get(3)?;
+    let price_at_note: f64 = row.get(4)?;
+    let title: String = row.get(5)?;
+    let content: String = row.get(6)?;
+    let tags: String = row.get(7)?;
+    let status: String = row.get(8)?;
+    let target_price: Option<f64> = row.get(9)?;
+    let stop_loss: Option<f64> = row.get(10)?;
+    let outcome_note: Option<String> = row.get(11)?;
+    let verified_at: Option<i64> = row.get(12)?;
+    let ref_json: String = row.get(13)?;
+    let created_at: i64 = row.get(14)?;
+    let updated_at: i64 = row.get(15)?;
+
+    let reference_note_ids: Vec<i64> = serde_json::from_str(&ref_json).unwrap_or_default();
+
+    Ok(StockNote {
+        id,
+        symbol,
+        timeframe,
+        candle_timestamp,
+        price_at_note,
+        title,
+        content,
+        tags,
+        status,
+        target_price,
+        stop_loss,
+        outcome_note,
+        verified_at,
+        reference_note_ids,
+        created_at,
+        updated_at,
+    })
 }
 
 #[cfg(test)]
@@ -981,5 +1257,94 @@ mod tests {
             !db.is_fresh("TEST.NS", "15m", 300).unwrap(),
             "Gap detected must make cache stale"
         );
+    }
+
+    #[test]
+    fn test_stock_notes_crud_and_cascade_delete() {
+        let db = MarketDb::open_in_memory().unwrap();
+
+        // 1. Create Note 1
+        let note1 = db
+            .create_note(&CreateNoteInput {
+                symbol: "HDFCBANK.NS".to_string(),
+                timeframe: "15m".to_string(),
+                candle_timestamp: Some(1790000000),
+                price_at_note: 1650.50,
+                title: "Momentum breakout setup".to_string(),
+                content: "Breakout above 1640 with volume surge".to_string(),
+                tags: "breakout, momentum".to_string(),
+                target_price: Some(1720.0),
+                stop_loss: Some(1615.0),
+                reference_note_ids: vec![],
+            })
+            .unwrap();
+
+        assert_eq!(note1.id, 1);
+        assert_eq!(note1.symbol, "HDFCBANK.NS");
+        assert_eq!(note1.price_at_note, 1650.50);
+        assert_eq!(note1.status, "open");
+
+        // 2. Create Note 2 referencing Note 1
+        let note2 = db
+            .create_note(&CreateNoteInput {
+                symbol: "HDFCBANK.NS".to_string(),
+                timeframe: "15m".to_string(),
+                candle_timestamp: Some(1790003600),
+                price_at_note: 1680.00,
+                title: "Follow-up consolidation".to_string(),
+                content: "Holding above breakout level".to_string(),
+                tags: "consolidation".to_string(),
+                target_price: Some(1720.0),
+                stop_loss: Some(1645.0),
+                reference_note_ids: vec![note1.id],
+            })
+            .unwrap();
+
+        assert_eq!(note2.id, 2);
+        assert_eq!(note2.reference_note_ids, vec![1]);
+
+        // 3. List notes by symbol
+        let hdfc_notes = db.list_notes(Some("HDFCBANK.NS"), None).unwrap();
+        assert_eq!(hdfc_notes.len(), 2);
+        assert_eq!(hdfc_notes[0].id, 2); // Ordered by created_at DESC
+
+        // 4. Update note 1 (verification / audit)
+        let updated = db
+            .update_note(
+                note1.id,
+                &UpdateNoteInput {
+                    status: Some("validated".to_string()),
+                    outcome_note: Some("Hit target of 1720 on day 3".to_string()),
+                    verified_at: Some(chrono::Utc::now().timestamp()),
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .expect("Note exists");
+
+        assert_eq!(updated.status, "validated");
+        assert_eq!(
+            updated.outcome_note.as_deref(),
+            Some("Hit target of 1720 on day 3")
+        );
+
+        // 5. Test filtering by status
+        let open_notes = db.list_notes(None, Some("open")).unwrap();
+        assert_eq!(open_notes.len(), 1);
+        assert_eq!(open_notes[0].id, 2);
+
+        let validated_notes = db.list_notes(None, Some("validated")).unwrap();
+        assert_eq!(validated_notes.len(), 1);
+        assert_eq!(validated_notes[0].id, 1);
+
+        // 6. Test delete_note
+        let deleted = db.delete_note(note2.id).unwrap();
+        assert!(deleted);
+        assert!(db.get_note(note2.id).unwrap().is_none());
+
+        // 7. Test cascade delete: deleting ticker cascades and deletes its notes
+        db.delete_ticker("HDFCBANK.NS").unwrap();
+        let notes_after = db.list_notes(Some("HDFCBANK.NS"), None).unwrap();
+        assert_eq!(notes_after.len(), 0);
     }
 }
