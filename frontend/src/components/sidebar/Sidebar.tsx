@@ -228,7 +228,7 @@ export const Sidebar: React.FC = () => {
                 <div
                   style={{
                     fontWeight: 700,
-                    fontSize: '12px',
+                    fontSize: '11px',
                     color: isPos ? 'var(--bullish)' : 'var(--bearish)',
                     textAlign: 'right',
                   }}

@@ -465,7 +465,7 @@
     }
 
     .stock-row {
-      padding: 9px 12px;
+      padding: 7px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -480,19 +480,24 @@
       border-left: 3px solid var(--accent);
     }
 
-    .stock-sym-title {
+    .stock-sym, .stock-sym-title {
       font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 12px;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: -0.2px;
+      line-height: 1.25;
+      color: var(--text-primary);
     }
 
     .stock-corp-name {
-      font-size: 11px;
+      font-size: 9.5px;
       color: var(--text-muted);
       max-width: 140px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      line-height: 1.2;
+      margin-top: 1px;
     }
 
     .stock-badge-pill {
@@ -582,7 +587,7 @@
     .hero-sym, .hero-symbol {
       font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       margin: 0;
       color: var(--text-primary);
     }
@@ -887,6 +892,24 @@
       width: 100%;
       border-radius: 4px;
       overflow: hidden;
+    }
+
+    .grid-chart-sym {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: -0.2px;
+      color: var(--text-primary);
+    }
+
+    .grid-chart-name {
+      font-size: 9.5px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+      margin-top: 1px;
     }
 
     /* 4. Collapsible Right Drawer: Intelligence, Fundamentals & AI */
