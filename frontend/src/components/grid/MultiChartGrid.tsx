@@ -127,6 +127,7 @@ export const MultiChartGrid: React.FC = () => {
     gridSearch,
     gridPage,
     gridPageSize,
+    setGridPage,
     timeframe,
     selectStock,
     setViewMode,
@@ -144,6 +145,13 @@ export const MultiChartGrid: React.FC = () => {
   // Paginate
   const startIndex = (gridPage - 1) * gridPageSize;
   const pageItems = filteredItems.slice(startIndex, startIndex + gridPageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / gridPageSize));
+
+  useEffect(() => {
+    if (gridPage > totalPages) {
+      setGridPage(totalPages);
+    }
+  }, [gridPage, totalPages, setGridPage]);
 
   const handleSelect = (symbol: string) => {
     selectStock(symbol);
