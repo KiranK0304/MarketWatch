@@ -133,7 +133,7 @@ async fn add_stock(
     }
 
     let added = StockEntry {
-        symbol: sym_upper,
+        symbol: sym_upper.clone(),
         name: new_stock.name.trim().to_string(),
     };
 
@@ -147,6 +147,14 @@ async fn add_stock(
             }),
         )
     })?;
+
+    let _ = state.db.upsert_ticker(&crate::storage::Ticker {
+        symbol: added.symbol.clone(),
+        name: added.name.clone(),
+        exchange: "NSE".to_string(),
+        is_active: true,
+        created_at: chrono::Utc::now().timestamp(),
+    });
 
     Ok(Json(added))
 }
@@ -197,6 +205,8 @@ async fn delete_stock(
             }),
         )
     })?;
+
+    let _ = state.db.delete_ticker(&sym_upper);
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -510,6 +520,9 @@ pub async fn start_server(
 ) -> anyhow::Result<()> {
     let provider = Arc::new(YahooProvider::new()?);
     let db = MarketDb::open_default()?;
+    if let Ok(cfg) = config::load_stock_config(&config_path) {
+        let _ = db.sync_tickers(&cfg.stocks);
+    }
     let state = WebState {
         config_path,
         provider,

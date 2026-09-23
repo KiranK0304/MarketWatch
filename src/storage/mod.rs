@@ -13,6 +13,16 @@ use serde::{Deserialize, Serialize};
 use crate::domain::Candle;
 use crate::error::MarketError;
 
+/// A tracked stock ticker entry in the primary SQLite registry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Ticker {
+    pub symbol: String,
+    pub name: String,
+    pub exchange: String,
+    pub is_active: bool,
+    pub created_at: i64,
+}
+
 /// Metadata tracking cache state and last API synchronization per symbol & timeframe.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheSyncMeta {
@@ -66,33 +76,120 @@ impl MarketDb {
              PRAGMA foreign_keys = ON;",
         )?;
 
-        // Schema setup
+        // Schema setup: Primary tickers registry table
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS candles (
-                symbol          TEXT    NOT NULL,
-                timeframe       TEXT    NOT NULL,
-                timestamp       INTEGER NOT NULL,
-                open            REAL    NOT NULL,
-                high            REAL    NOT NULL,
-                low             REAL    NOT NULL,
-                close           REAL    NOT NULL,
-                volume          INTEGER NOT NULL,
-                PRIMARY KEY (symbol, timeframe, timestamp)
-            ) WITHOUT ROWID;
-
-            CREATE INDEX IF NOT EXISTS idx_candles_lookup 
-            ON candles (symbol, timeframe, timestamp ASC);
-
-            CREATE TABLE IF NOT EXISTS cache_sync_meta (
-                symbol          TEXT    NOT NULL,
-                timeframe       TEXT    NOT NULL,
-                last_synced_at  INTEGER NOT NULL,
-                first_candle_ts INTEGER NOT NULL,
-                last_candle_ts  INTEGER NOT NULL,
-                candle_count    INTEGER NOT NULL,
-                PRIMARY KEY (symbol, timeframe)
+            "CREATE TABLE IF NOT EXISTS tickers (
+                symbol      TEXT PRIMARY KEY NOT NULL,
+                name        TEXT NOT NULL,
+                exchange    TEXT NOT NULL DEFAULT 'NSE',
+                is_active   INTEGER NOT NULL DEFAULT 1,
+                created_at  INTEGER NOT NULL
             );",
         )?;
+
+        // Check if candles table already exists
+        let candles_table_exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='candles'",
+                [],
+                |row| {
+                    let count: i64 = row.get(0)?;
+                    Ok(count > 0)
+                },
+            )
+            .unwrap_or(false);
+
+        if candles_table_exists {
+            // Seed tickers table with any existing symbols in candles or cache_sync_meta
+            let _ = conn.execute_batch(
+                "INSERT OR IGNORE INTO tickers (symbol, name, exchange, is_active, created_at)
+                 SELECT DISTINCT symbol, symbol, 'NSE', 1, CAST(strftime('%s', 'now') AS INTEGER) FROM candles;
+                 INSERT OR IGNORE INTO tickers (symbol, name, exchange, is_active, created_at)
+                 SELECT DISTINCT symbol, symbol, 'NSE', 1, CAST(strftime('%s', 'now') AS INTEGER) FROM cache_sync_meta;",
+            );
+
+            // Check if candles already has foreign key configured
+            let candles_has_fk: bool = {
+                let mut stmt = conn.prepare("PRAGMA foreign_key_list(candles)")?;
+                let mut rows = stmt.query([])?;
+                rows.next()?.is_some()
+            };
+
+            if !candles_has_fk {
+                // Migrate candles and cache_sync_meta to include FOREIGN KEY constraints
+                conn.execute_batch(
+                    "PRAGMA foreign_keys = OFF;
+                     BEGIN TRANSACTION;
+
+                     CREATE TABLE candles_new (
+                         symbol          TEXT    NOT NULL,
+                         timeframe       TEXT    NOT NULL,
+                         timestamp       INTEGER NOT NULL,
+                         open            REAL    NOT NULL,
+                         high            REAL    NOT NULL,
+                         low             REAL    NOT NULL,
+                         close           REAL    NOT NULL,
+                         volume          INTEGER NOT NULL,
+                         PRIMARY KEY (symbol, timeframe, timestamp),
+                         FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+                     ) WITHOUT ROWID;
+
+                     INSERT INTO candles_new SELECT * FROM candles;
+                     DROP TABLE candles;
+                     ALTER TABLE candles_new RENAME TO candles;
+                     CREATE INDEX IF NOT EXISTS idx_candles_lookup 
+                     ON candles (symbol, timeframe, timestamp ASC);
+
+                     CREATE TABLE cache_sync_meta_new (
+                         symbol          TEXT    NOT NULL,
+                         timeframe       TEXT    NOT NULL,
+                         last_synced_at  INTEGER NOT NULL,
+                         first_candle_ts INTEGER NOT NULL,
+                         last_candle_ts  INTEGER NOT NULL,
+                         candle_count    INTEGER NOT NULL,
+                         PRIMARY KEY (symbol, timeframe),
+                         FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+                     );
+
+                     INSERT INTO cache_sync_meta_new SELECT * FROM cache_sync_meta;
+                     DROP TABLE cache_sync_meta;
+                     ALTER TABLE cache_sync_meta_new RENAME TO cache_sync_meta;
+
+                     COMMIT;
+                     PRAGMA foreign_keys = ON;",
+                )?;
+            }
+        } else {
+            // Fresh database setup with foreign keys defined upfront
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS candles (
+                    symbol          TEXT    NOT NULL,
+                    timeframe       TEXT    NOT NULL,
+                    timestamp       INTEGER NOT NULL,
+                    open            REAL    NOT NULL,
+                    high            REAL    NOT NULL,
+                    low             REAL    NOT NULL,
+                    close           REAL    NOT NULL,
+                    volume          INTEGER NOT NULL,
+                    PRIMARY KEY (symbol, timeframe, timestamp),
+                    FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+                ) WITHOUT ROWID;
+
+                CREATE INDEX IF NOT EXISTS idx_candles_lookup 
+                ON candles (symbol, timeframe, timestamp ASC);
+
+                CREATE TABLE IF NOT EXISTS cache_sync_meta (
+                    symbol          TEXT    NOT NULL,
+                    timeframe       TEXT    NOT NULL,
+                    last_synced_at  INTEGER NOT NULL,
+                    first_candle_ts INTEGER NOT NULL,
+                    last_candle_ts  INTEGER NOT NULL,
+                    candle_count    INTEGER NOT NULL,
+                    PRIMARY KEY (symbol, timeframe),
+                    FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
+                );",
+            )?;
+        }
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -171,6 +268,13 @@ impl MarketDb {
             .lock()
             .map_err(|e| MarketError::Database(e.to_string()))?;
         let tx = conn.transaction()?;
+
+        // Ensure parent ticker exists in tickers table to satisfy foreign key constraint
+        tx.execute(
+            "INSERT OR IGNORE INTO tickers (symbol, name, exchange, is_active, created_at)
+             VALUES (?1, ?1, 'NSE', 1, ?2)",
+            params![symbol, synced_at],
+        )?;
 
         {
             let mut stmt = tx.prepare_cached(
@@ -305,6 +409,121 @@ impl MarketDb {
             Ok(meta.last_synced_at >= last_close_epoch)
         }
     }
+
+    /// Upsert a ticker into the primary tickers table.
+    pub fn upsert_ticker(&self, ticker: &Ticker) -> Result<(), MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO tickers (symbol, name, exchange, is_active, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(symbol) DO UPDATE SET
+                name = excluded.name,
+                exchange = excluded.exchange,
+                is_active = excluded.is_active",
+            params![
+                ticker.symbol,
+                ticker.name,
+                ticker.exchange,
+                if ticker.is_active { 1 } else { 0 },
+                ticker.created_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Synchronize stock universe entries from configuration into the `tickers` table.
+    pub fn sync_tickers(&self, stocks: &[crate::config::StockEntry]) -> Result<(), MarketError> {
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let now = Utc::now().timestamp();
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO tickers (symbol, name, exchange, is_active, created_at)
+                 VALUES (?1, ?2, 'NSE', 1, ?3)
+                 ON CONFLICT(symbol) DO UPDATE SET
+                    name = excluded.name,
+                    is_active = 1",
+            )?;
+            for s in stocks {
+                stmt.execute(params![s.symbol, s.name, now])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Retrieve a ticker by its symbol.
+    #[allow(dead_code)]
+    pub fn get_ticker(&self, symbol: &str) -> Result<Option<Ticker>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT symbol, name, exchange, is_active, created_at
+             FROM tickers
+             WHERE symbol = ?1",
+        )?;
+        let mut rows = stmt.query(params![symbol])?;
+        if let Some(row) = rows.next()? {
+            let is_active_int: i64 = row.get(3)?;
+            Ok(Some(Ticker {
+                symbol: row.get(0)?,
+                name: row.get(1)?,
+                exchange: row.get(2)?,
+                is_active: is_active_int != 0,
+                created_at: row.get(4)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Retrieve all tickers ordered by symbol.
+    #[allow(dead_code)]
+    pub fn get_all_tickers(&self) -> Result<Vec<Ticker>, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT symbol, name, exchange, is_active, created_at
+             FROM tickers
+             ORDER BY symbol ASC",
+        )?;
+        let ticker_iter = stmt.query_map([], |row| {
+            let is_active_int: i64 = row.get(3)?;
+            Ok(Ticker {
+                symbol: row.get(0)?,
+                name: row.get(1)?,
+                exchange: row.get(2)?,
+                is_active: is_active_int != 0,
+                created_at: row.get(4)?,
+            })
+        })?;
+        let mut tickers = Vec::new();
+        for t in ticker_iter {
+            tickers.push(t?);
+        }
+        Ok(tickers)
+    }
+
+    /// Delete a ticker by symbol. Due to `ON DELETE CASCADE`, all associated
+    /// candles and sync metadata are also deleted automatically.
+    pub fn delete_ticker(&self, symbol: &str) -> Result<bool, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let affected = conn.execute("DELETE FROM tickers WHERE symbol = ?1", params![symbol])?;
+        Ok(affected > 0)
+    }
 }
 
 /// Calculate the Unix epoch timestamp for the most recent market close (15:30 IST).
@@ -401,5 +620,121 @@ mod tests {
         let loaded = db.get_candles("INFY.NS", "1d").unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].close, 110.0); // updated in-place without duplicate
+    }
+
+    #[test]
+    fn test_tickers_crud_and_cascade_delete() {
+        let db = MarketDb::open_in_memory().expect("in-memory db open");
+
+        // 1. Upsert a ticker
+        let ticker = Ticker {
+            symbol: "RELIANCE.NS".to_string(),
+            name: "Reliance Industries Ltd".to_string(),
+            exchange: "NSE".to_string(),
+            is_active: true,
+            created_at: 1000,
+        };
+        db.upsert_ticker(&ticker).unwrap();
+
+        let fetched = db.get_ticker("RELIANCE.NS").unwrap().expect("ticker found");
+        assert_eq!(fetched.name, "Reliance Industries Ltd");
+        assert_eq!(fetched.exchange, "NSE");
+        assert!(fetched.is_active);
+
+        // 2. Add candles and sync meta for this ticker
+        let candles = vec![
+            make_test_candle(1000, 2500.0, 2520.0),
+            make_test_candle(2000, 2520.0, 2550.0),
+        ];
+        db.save_candles("RELIANCE.NS", "15m", &candles, 2500).unwrap();
+
+        assert_eq!(db.get_candles("RELIANCE.NS", "15m").unwrap().len(), 2);
+        assert!(db.get_sync_meta("RELIANCE.NS", "15m").unwrap().is_some());
+
+        // 3. Delete ticker -> Foreign Key CASCADE should wipe associated candles and sync meta
+        let deleted = db.delete_ticker("RELIANCE.NS").unwrap();
+        assert!(deleted);
+
+        assert!(db.get_ticker("RELIANCE.NS").unwrap().is_none());
+        assert_eq!(db.get_candles("RELIANCE.NS", "15m").unwrap().len(), 0);
+        assert!(db.get_sync_meta("RELIANCE.NS", "15m").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_sync_tickers_from_config() {
+        let db = MarketDb::open_in_memory().expect("in-memory db open");
+
+        let stocks = vec![
+            crate::config::StockEntry {
+                symbol: "HDFCBANK.NS".to_string(),
+                name: "HDFC Bank Ltd".to_string(),
+            },
+            crate::config::StockEntry {
+                symbol: "ICICIBANK.NS".to_string(),
+                name: "ICICI Bank Ltd".to_string(),
+            },
+        ];
+
+        db.sync_tickers(&stocks).unwrap();
+
+        let all = db.get_all_tickers().unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].symbol, "HDFCBANK.NS");
+        assert_eq!(all[0].name, "HDFC Bank Ltd");
+        assert_eq!(all[1].symbol, "ICICIBANK.NS");
+    }
+
+    #[test]
+    fn test_migration_from_unconstrained_schema() {
+        // Create an unconstrained raw sqlite connection mimicking old schema
+        let raw_conn = Connection::open_in_memory().unwrap();
+        raw_conn
+            .execute_batch(
+                "CREATE TABLE candles (
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    open REAL NOT NULL,
+                    high REAL NOT NULL,
+                    low REAL NOT NULL,
+                    close REAL NOT NULL,
+                    volume INTEGER NOT NULL,
+                    PRIMARY KEY (symbol, timeframe, timestamp)
+                ) WITHOUT ROWID;
+
+                CREATE TABLE cache_sync_meta (
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    last_synced_at INTEGER NOT NULL,
+                    first_candle_ts INTEGER NOT NULL,
+                    last_candle_ts INTEGER NOT NULL,
+                    candle_count INTEGER NOT NULL,
+                    PRIMARY KEY (symbol, timeframe)
+                );
+
+                INSERT INTO candles VALUES ('WIPRO.NS', '1d', 1000, 400.0, 410.0, 395.0, 405.0, 10000);
+                INSERT INTO cache_sync_meta VALUES ('WIPRO.NS', '1d', 1200, 1000, 1000, 1);",
+            )
+            .unwrap();
+
+        // Run MarketDb::init_connection which performs automatic migration
+        let db = MarketDb::init_connection(raw_conn).unwrap();
+
+        // Check that WIPRO.NS was populated into tickers
+        let ticker = db.get_ticker("WIPRO.NS").unwrap().expect("ticker migrated");
+        assert_eq!(ticker.symbol, "WIPRO.NS");
+
+        // Check that existing candles and meta were preserved
+        let candles = db.get_candles("WIPRO.NS", "1d").unwrap();
+        assert_eq!(candles.len(), 1);
+        assert_eq!(candles[0].close, 405.0);
+
+        let meta = db.get_sync_meta("WIPRO.NS", "1d").unwrap().expect("meta preserved");
+        assert_eq!(meta.candle_count, 1);
+
+        // Check that cascade delete now works on migrated table
+        db.delete_ticker("WIPRO.NS").unwrap();
+        assert_eq!(db.get_candles("WIPRO.NS", "1d").unwrap().len(), 0);
+        assert!(db.get_sync_meta("WIPRO.NS", "1d").unwrap().is_none());
     }
 }

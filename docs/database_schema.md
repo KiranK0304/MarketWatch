@@ -14,9 +14,35 @@ MarketWatch uses an embedded **SQLite** database (`marketwatch.db`) for caching 
 
 ## Tables
 
-### 1. `candles` (Time-Series Store)
+### 1. `tickers` (Primary Ticker Registry)
 
-Stores individual OHLCV candlestick bars across all tracked stocks and timeframes.
+Stores canonical metadata for all tracked stocks in the universe. Acts as the parent table for time-series candles and sync metadata.
+
+```sql
+CREATE TABLE IF NOT EXISTS tickers (
+    symbol      TEXT PRIMARY KEY NOT NULL,
+    name        TEXT NOT NULL,
+    exchange    TEXT NOT NULL DEFAULT 'NSE',
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  INTEGER NOT NULL
+);
+```
+
+#### Columns
+
+| Column | Type | Nullable | Description |
+| :--- | :--- | :--- | :--- |
+| `symbol` | TEXT | NO | NSE stock ticker symbol (Primary Key, e.g. `'RELIANCE.NS'`, `'TCS.NS'`) |
+| `name` | TEXT | NO | Full company name (e.g. `'Reliance Industries Ltd'`) |
+| `exchange` | TEXT | NO | Stock exchange identifier (defaults to `'NSE'`) |
+| `is_active` | INTEGER | NO | Flag indicating if ticker is actively tracked (`1` = active, `0` = inactive) |
+| `created_at` | INTEGER | NO | Unix epoch timestamp of when ticker was registered |
+
+---
+
+### 2. `candles` (Time-Series Store)
+
+Stores individual OHLCV candlestick bars across all tracked stocks and timeframes, linked via foreign key to `tickers`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS candles (
@@ -28,7 +54,8 @@ CREATE TABLE IF NOT EXISTS candles (
     low             REAL    NOT NULL,
     close           REAL    NOT NULL,
     volume          INTEGER NOT NULL,
-    PRIMARY KEY (symbol, timeframe, timestamp)
+    PRIMARY KEY (symbol, timeframe, timestamp),
+    FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
 ) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS idx_candles_lookup 
@@ -39,7 +66,7 @@ ON candles (symbol, timeframe, timestamp ASC);
 
 | Column | Type | Nullable | Description |
 | :--- | :--- | :--- | :--- |
-| `symbol` | TEXT | NO | NSE stock symbol with `.NS` suffix (e.g. `'RELIANCE.NS'`, `'TCS.NS'`) |
+| `symbol` | TEXT | NO | NSE stock symbol referencing `tickers(symbol)` (Foreign Key, `ON DELETE CASCADE`) |
 | `timeframe` | TEXT | NO | Timeframe interval code (`'5m'`, `'15m'`, `'30m'`, `'1h'`, `'1d'`, `'1w'`) |
 | `timestamp` | INTEGER | NO | Unix epoch timestamp in seconds (start of the candlestick period) |
 | `open` | REAL | NO | Opening price during the period (₹) |
@@ -50,15 +77,16 @@ ON candles (symbol, timeframe, timestamp ASC);
 
 #### Key Design Decisions
 
+* **Foreign Key `(symbol) REFERENCES tickers(symbol) ON DELETE CASCADE`**: Ensures referential integrity; deleting a ticker automatically cascades and removes all associated candlestick history.
 * **Composite Primary Key `(symbol, timeframe, timestamp)`**: Guarantees that duplicate bars for the same point in time cannot exist.
 * **`WITHOUT ROWID`**: Optimizes B-tree storage by eliminating the hidden 64-bit rowid integer, saving disk space and speeding up range scans on composite primary keys.
 * **`ON CONFLICT ... DO UPDATE` (Upsert)**: When new data arrives, an unclosed / forming candle updates its `high`, `low`, `close`, and `volume` in-place without duplicating rows.
 
 ---
 
-### 2. `cache_sync_meta` (Sync Metadata & Freshness Tracker)
+### 3. `cache_sync_meta` (Sync Metadata & Freshness Tracker)
 
-Stores synchronization state per `(symbol, timeframe)` pair. There is exactly one row per stock per timeframe (~900 small rows total for 150 stocks across 6 timeframes).
+Stores synchronization state per `(symbol, timeframe)` pair, linked via foreign key to `tickers`. There is exactly one row per stock per timeframe (~900 small rows total for 150 stocks across 6 timeframes).
 
 ```sql
 CREATE TABLE IF NOT EXISTS cache_sync_meta (
@@ -68,7 +96,8 @@ CREATE TABLE IF NOT EXISTS cache_sync_meta (
     first_candle_ts INTEGER NOT NULL,
     last_candle_ts  INTEGER NOT NULL,
     candle_count    INTEGER NOT NULL,
-    PRIMARY KEY (symbol, timeframe)
+    PRIMARY KEY (symbol, timeframe),
+    FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
 );
 ```
 
@@ -76,7 +105,7 @@ CREATE TABLE IF NOT EXISTS cache_sync_meta (
 
 | Column | Type | Nullable | Description |
 | :--- | :--- | :--- | :--- |
-| `symbol` | TEXT | NO | NSE stock symbol (e.g. `'RELIANCE.NS'`) |
+| `symbol` | TEXT | NO | NSE stock symbol referencing `tickers(symbol)` (Foreign Key, `ON DELETE CASCADE`) |
 | `timeframe` | TEXT | NO | Timeframe code (e.g. `'15m'`) |
 | `last_synced_at` | INTEGER | NO | Unix epoch timestamp of when Yahoo Finance API was last queried |
 | `first_candle_ts` | INTEGER | NO | Timestamp of earliest stored candle for this symbol & timeframe |
