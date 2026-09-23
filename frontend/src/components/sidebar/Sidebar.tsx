@@ -21,6 +21,7 @@ export const Sidebar: React.FC = () => {
     filteredMovers,
     triggerScan,
     setViewMode,
+    setGridPage,
   } = useApp();
 
   // Add stock inputs
@@ -36,6 +37,15 @@ export const Sidebar: React.FC = () => {
       s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
     );
   }, [stocks, sidebarSearch]);
+
+  // Filtered movers by search query
+  const searchedMovers = useMemo(() => {
+    if (!sidebarSearch.trim()) return filteredMovers;
+    const q = sidebarSearch.toLowerCase();
+    return filteredMovers.filter(
+      m => m.symbol.toLowerCase().includes(q) || (m.name && m.name.toLowerCase().includes(q))
+    );
+  }, [filteredMovers, sidebarSearch]);
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +67,10 @@ export const Sidebar: React.FC = () => {
         <div className="sidebar-tabs">
           <button
             className={`tab-btn ${sidebarTab === 'universe' ? 'active' : ''}`}
-            onClick={() => setSidebarTab('universe')}
+            onClick={() => {
+              setSidebarTab('universe');
+              setGridPage(1);
+            }}
           >
             <span>Universe</span>
             <span className="count-pill" id="count-universe">
@@ -66,7 +79,10 @@ export const Sidebar: React.FC = () => {
           </button>
           <button
             className={`tab-btn ${sidebarTab === 'movers' ? 'active' : ''}`}
-            onClick={() => setSidebarTab('movers')}
+            onClick={() => {
+              setSidebarTab('movers');
+              setGridPage(1);
+            }}
           >
             <span>Top Movers</span>
             <span className="count-pill" id="count-movers">
@@ -99,7 +115,10 @@ export const Sidebar: React.FC = () => {
                 : 'Filter movers...'
             }
             value={sidebarSearch}
-            onChange={e => setSidebarSearch(e.target.value)}
+            onChange={e => {
+              setSidebarSearch(e.target.value);
+              setGridPage(1);
+            }}
           />
         </div>
 
@@ -201,12 +220,14 @@ export const Sidebar: React.FC = () => {
               );
             })
           )
-        ) : filteredMovers.length === 0 ? (
+        ) : searchedMovers.length === 0 ? (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-            No movers found matching ±{moversThreshold}%.
+            {sidebarSearch.trim()
+              ? `No movers matching "${sidebarSearch}".`
+              : `No movers found matching ±${moversThreshold}%.`}
           </div>
         ) : (
-          filteredMovers.map(mover => {
+          searchedMovers.map(mover => {
             const isActive = activeStock?.symbol === mover.symbol;
             const isPos = mover.change_percent >= 0;
 

@@ -14,10 +14,8 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
     setTimeframe,
     viewMode,
     setViewMode,
-    gridScope,
-    setGridScope,
-    gridSearch,
-    setGridSearch,
+    sidebarTab,
+    sidebarSearch,
     gridPage,
     setGridPage,
     gridPageSize,
@@ -36,13 +34,12 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
 
   const timeframes: Timeframe[] = ['5m', '15m', '30m', '1h', '1d', '1w'];
 
-  // Grid pagination calculations (post-search, mirroring MultiChartGrid's
-  // filter — counting pre-search totals showed e.g. "1 / 7" over an empty grid).
+  // Grid pagination calculations (reflecting sidebar tab and search)
   const gridItems =
-    gridScope === 'universe'
+    sidebarTab === 'universe'
       ? stocks
       : filteredMovers.map(m => ({ symbol: m.symbol, name: m.name }));
-  const gridQuery = gridSearch.trim().toLowerCase();
+  const gridQuery = sidebarSearch.trim().toLowerCase();
   const totalGridItems = gridQuery
     ? gridItems.filter(
         s =>
@@ -151,52 +148,16 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
           </div>
         )}
 
-        {/* Grid-Specific Controls (Scope, Search, Pagination) */}
+        {/* Grid-Specific Controls (Pagination only) */}
         {viewMode === 'grid' && (
           <div className="grid-controls-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="view-mode-group" style={{ height: '26px' }}>
-              <button
-                className={`view-mode-btn ${gridScope === 'universe' ? 'active' : ''}`}
-                style={{ fontSize: '11px', padding: '0 8px' }}
-                onClick={() => {
-                  setGridScope('universe');
-                  setGridPage(1);
-                }}
-              >
-                All ({stocks.length})
-              </button>
-              <button
-                className={`view-mode-btn ${gridScope === 'movers' ? 'active' : ''}`}
-                style={{ fontSize: '11px', padding: '0 8px' }}
-                onClick={() => {
-                  setGridScope('movers');
-                  setGridPage(1);
-                }}
-              >
-                Movers ({filteredMovers.length})
-              </button>
-            </div>
-
-            <div className="search-wrap" style={{ width: '130px', height: '26px' }}>
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Filter grid..."
-                value={gridSearch}
-                onChange={e => {
-                  setGridSearch(e.target.value);
-                  setGridPage(1);
-                }}
-                style={{ fontSize: '11px', padding: '0 8px' }}
-              />
-            </div>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
               <button
                 className="top-action-btn"
                 style={{ padding: '2px 6px', fontSize: '10px' }}
                 disabled={gridPage <= 1}
                 onClick={() => setGridPage(p => Math.max(1, p - 1))}
+                title="Previous page"
               >
                 ◀
               </button>
@@ -208,6 +169,7 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
                 style={{ padding: '2px 6px', fontSize: '10px' }}
                 disabled={gridPage >= totalPages}
                 onClick={() => setGridPage(p => Math.min(totalPages, p + 1))}
+                title="Next page"
               >
                 ▶
               </button>

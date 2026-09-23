@@ -123,8 +123,8 @@ export const MultiChartGrid: React.FC = () => {
   const {
     stocks,
     filteredMovers,
-    gridScope,
-    gridSearch,
+    sidebarTab,
+    sidebarSearch,
     gridPage,
     gridPageSize,
     setGridPage,
@@ -133,12 +133,15 @@ export const MultiChartGrid: React.FC = () => {
     setViewMode,
   } = useApp();
 
-  // Filter items based on scope and search query
-  const items = gridScope === 'universe' ? stocks : filteredMovers.map(m => ({ symbol: m.symbol, name: m.name || m.symbol }));
+  // Filter items based on active sidebar tab (Universe vs Movers) and sidebarSearch query
+  const items =
+    sidebarTab === 'universe'
+      ? stocks
+      : filteredMovers.map(m => ({ symbol: m.symbol, name: m.name || m.symbol }));
 
   const filteredItems = items.filter(s => {
-    if (!gridSearch.trim()) return true;
-    const q = gridSearch.toLowerCase();
+    if (!sidebarSearch.trim()) return true;
+    const q = sidebarSearch.toLowerCase();
     return s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
   });
 

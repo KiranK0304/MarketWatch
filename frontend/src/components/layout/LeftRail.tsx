@@ -3,14 +3,8 @@ import { useApp } from '../../context/AppContext';
 
 export const LeftRail: React.FC = () => {
   const {
-    sidebarTab,
-    setSidebarTab,
-    viewMode,
-    setViewMode,
     openShortcuts,
     openCommandPalette,
-    stocks,
-    filteredMovers,
     isDark,
     toggleTheme,
   } = useApp();
@@ -24,51 +18,7 @@ export const LeftRail: React.FC = () => {
         </svg>
       </div>
 
-      <div className="rail-nav">
-        <button
-          className={`rail-btn ${sidebarTab === 'universe' && viewMode === 'single' ? 'active' : ''}`}
-          title="Watchlist & All Stocks"
-          onClick={() => {
-            setSidebarTab('universe');
-            setViewMode('single');
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 3v18h18" />
-            <path d="M18 17V9" />
-            <path d="M13 17V5" />
-            <path d="M8 17v-3" />
-          </svg>
-          <span className="rail-badge">{stocks.length}</span>
-        </button>
-
-        <button
-          className={`rail-btn ${sidebarTab === 'movers' && viewMode === 'single' ? 'active' : ''}`}
-          title="Top Movers & Breakouts"
-          onClick={() => {
-            setSidebarTab('movers');
-            setViewMode('single');
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-          <span className="rail-badge">{filteredMovers.length}</span>
-        </button>
-
-        <button
-          className={`rail-btn ${viewMode === 'grid' ? 'active' : ''}`}
-          title="Multi-Chart Grid View (G)"
-          onClick={() => setViewMode(viewMode === 'grid' ? 'single' : 'grid')}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect width="7" height="7" x="3" y="3" rx="1" />
-            <rect width="7" height="7" x="14" y="3" rx="1" />
-            <rect width="7" height="7" x="14" y="14" rx="1" />
-            <rect width="7" height="7" x="3" y="14" rx="1" />
-          </svg>
-        </button>
-      </div>
+      <div className="rail-spacer" />
 
       <div className="rail-footer">
         <button className="rail-btn" title="Command Palette (Ctrl+K)" onClick={openCommandPalette}>
