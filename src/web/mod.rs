@@ -14,7 +14,9 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::config::{self, StockEntry};
-use crate::domain::{ScanResult, StockMover, Timeframe};
+use crate::domain::{
+    CreateNoteInput, ScanResult, StockMover, StockNote, Timeframe, UpdateNoteInput,
+};
 use crate::provider::CandleSyncService;
 use crate::provider::yahoo::YahooProvider;
 use crate::scanner::{ScanState, Scanner};
@@ -46,6 +48,12 @@ pub struct CandlesQuery {
 pub struct ScanQuery {
     pub threshold: Option<f64>,
     pub force: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NotesQuery {
+    pub symbol: Option<String>,
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -397,6 +405,144 @@ async fn get_cache_meta(
     Ok(Json(meta))
 }
 
+/// List stock notes with optional symbol and status filters.
+async fn list_notes(
+    State(state): State<WebState>,
+    Query(query): Query<NotesQuery>,
+) -> Result<Json<Vec<StockNote>>, (StatusCode, Json<ErrorResponse>)> {
+    let notes = state
+        .db
+        .list_notes(query.symbol.as_deref(), query.status.as_deref())
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+    Ok(Json(notes))
+}
+
+/// Retrieve a single stock note by ID.
+async fn get_note(
+    State(state): State<WebState>,
+    Path(id): Path<i64>,
+) -> Result<Json<StockNote>, (StatusCode, Json<ErrorResponse>)> {
+    let note = state.db.get_note(id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    match note {
+        Some(n) => Ok(Json(n)),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Note #{id} not found"),
+            }),
+        )),
+    }
+}
+
+/// Create a new stock analysis note.
+async fn create_note(
+    State(state): State<WebState>,
+    Json(input): Json<CreateNoteInput>,
+) -> Result<(StatusCode, Json<StockNote>), (StatusCode, Json<ErrorResponse>)> {
+    if input.symbol.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Stock symbol cannot be empty".to_string(),
+            }),
+        ));
+    }
+    if input.title.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Note title cannot be empty".to_string(),
+            }),
+        ));
+    }
+    if input.content.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Note content cannot be empty".to_string(),
+            }),
+        ));
+    }
+
+    let note = state.db.create_note(&input).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    Ok((StatusCode::CREATED, Json(note)))
+}
+
+/// Update an existing stock analysis note.
+async fn update_note(
+    State(state): State<WebState>,
+    Path(id): Path<i64>,
+    Json(input): Json<UpdateNoteInput>,
+) -> Result<Json<StockNote>, (StatusCode, Json<ErrorResponse>)> {
+    let updated = state.db.update_note(id, &input).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    match updated {
+        Some(n) => Ok(Json(n)),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Note #{id} not found"),
+            }),
+        )),
+    }
+}
+
+/// Delete a stock analysis note.
+async fn delete_note(
+    State(state): State<WebState>,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let deleted = state.db.delete_note(id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Note #{id} not found"),
+            }),
+        ))
+    }
+}
+
 /// Build the Axum router with all routes and middleware.
 pub fn create_router(state: WebState) -> Router {
     Router::new()
@@ -410,6 +556,11 @@ pub fn create_router(state: WebState) -> Router {
         .route("/api/scan", get(scan_movers))
         .route("/api/scan/cached", get(get_scan_cached))
         .route("/api/scan/state", get(get_scan_state))
+        .route("/api/notes", get(list_notes).post(create_note))
+        .route(
+            "/api/notes/{id}",
+            get(get_note).put(update_note).delete(delete_note),
+        )
         .with_state(state)
 }
 
