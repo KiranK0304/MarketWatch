@@ -766,19 +766,29 @@ impl MarketDb {
 
     /// Create a new stock analysis note.
     pub fn create_note(&self, input: &CreateNoteInput) -> Result<StockNote, MarketError> {
+        input.validate().map_err(MarketError::InvalidInput)?;
         let sym_upper = input.symbol.trim().to_uppercase();
         let now = Utc::now().timestamp();
-        let ref_json =
-            serde_json::to_string(&input.reference_note_ids).unwrap_or_else(|_| "[]".to_string());
 
-        // Ensure symbol exists in tickers table to satisfy foreign key constraint
-        let _ = self.upsert_ticker(&Ticker {
-            symbol: sym_upper.clone(),
-            name: sym_upper.clone(),
-            exchange: "NSE".to_string(),
-            is_active: true,
-            created_at: now,
-        });
+        // Ensure symbol exists in the configured tickers universe
+        if self.get_ticker(&sym_upper)?.is_none() {
+            return Err(MarketError::NotFound(format!(
+                "Ticker '{sym_upper}' does not exist in the configured universe"
+            )));
+        }
+
+        // Validate that all referenced notes exist
+        let mut clean_refs = input.reference_note_ids.clone();
+        clean_refs.sort_unstable();
+        clean_refs.dedup();
+        for ref_id in &clean_refs {
+            if self.get_note(*ref_id)?.is_none() {
+                return Err(MarketError::NotFound(format!(
+                    "Referenced Note #{ref_id} does not exist"
+                )));
+            }
+        }
+        let ref_json = serde_json::to_string(&clean_refs).unwrap_or_else(|_| "[]".to_string());
 
         let conn = self
             .conn
@@ -822,7 +832,7 @@ impl MarketDb {
             stop_loss: input.stop_loss,
             outcome_note: None,
             verified_at: None,
-            reference_note_ids: input.reference_note_ids.clone(),
+            reference_note_ids: clean_refs,
             created_at: now,
             updated_at: now,
         })
@@ -904,6 +914,8 @@ impl MarketDb {
         id: i64,
         input: &UpdateNoteInput,
     ) -> Result<Option<StockNote>, MarketError> {
+        input.validate(id).map_err(MarketError::InvalidInput)?;
+
         let existing = match self.get_note(id)? {
             Some(n) => n,
             None => return Ok(None),
@@ -913,16 +925,59 @@ impl MarketDb {
         let updated_content = input.content.as_deref().unwrap_or(&existing.content).trim();
         let updated_tags = input.tags.as_deref().unwrap_or(&existing.tags).trim();
         let updated_status = input.status.as_deref().unwrap_or(&existing.status).trim();
-        let updated_target = input.target_price.or(existing.target_price);
-        let updated_stop = input.stop_loss.or(existing.stop_loss);
-        let updated_outcome = input.outcome_note.clone().or(existing.outcome_note);
-        let updated_verified = input.verified_at.or(existing.verified_at);
-        let updated_refs = input
-            .reference_note_ids
-            .as_ref()
-            .unwrap_or(&existing.reference_note_ids);
-        let ref_json = serde_json::to_string(updated_refs).unwrap_or_else(|_| "[]".to_string());
+
+        // Nullable fields support clearing to None via Some(None)
+        let updated_target = match input.target_price {
+            Some(Some(val)) => Some(val),
+            Some(None) => None,
+            None => existing.target_price,
+        };
+        let updated_stop = match input.stop_loss {
+            Some(Some(val)) => Some(val),
+            Some(None) => None,
+            None => existing.stop_loss,
+        };
+        let updated_outcome = match &input.outcome_note {
+            Some(Some(val)) => Some(val.trim().to_string()),
+            Some(None) => None,
+            None => existing.outcome_note,
+        };
+
         let now = Utc::now().timestamp();
+        let updated_verified = match input.verified_at {
+            Some(Some(ts)) => Some(ts),
+            Some(None) => None,
+            None => {
+                // If transitioning to a terminal status, automatically stamp verified_at
+                if (updated_status == "validated" || updated_status == "invalidated")
+                    && existing.verified_at.is_none()
+                {
+                    Some(now)
+                } else if updated_status == "open" {
+                    None
+                } else {
+                    existing.verified_at
+                }
+            }
+        };
+
+        let updated_refs = if let Some(ref refs) = input.reference_note_ids {
+            let mut clean_refs = refs.clone();
+            clean_refs.retain(|&r| r != id); // Disallow self-reference
+            clean_refs.sort_unstable();
+            clean_refs.dedup();
+            for ref_id in &clean_refs {
+                if self.get_note(*ref_id)?.is_none() {
+                    return Err(MarketError::NotFound(format!(
+                        "Referenced Note #{ref_id} does not exist"
+                    )));
+                }
+            }
+            clean_refs
+        } else {
+            existing.reference_note_ids
+        };
+        let ref_json = serde_json::to_string(&updated_refs).unwrap_or_else(|_| "[]".to_string());
 
         let conn = self
             .conn
@@ -1263,6 +1318,31 @@ mod tests {
     fn test_stock_notes_crud_and_cascade_delete() {
         let db = MarketDb::open_in_memory().unwrap();
 
+        // 0. Ensure ticker exists in the universe
+        db.upsert_ticker(&Ticker {
+            symbol: "HDFCBANK.NS".to_string(),
+            name: "HDFC Bank".to_string(),
+            exchange: "NSE".to_string(),
+            is_active: true,
+            created_at: 1790000000,
+        })
+        .unwrap();
+
+        // Reject creating a note for an unconfigured ticker
+        let unconfigured_res = db.create_note(&CreateNoteInput {
+            symbol: "UNKNOWN.NS".to_string(),
+            timeframe: "15m".to_string(),
+            candle_timestamp: Some(1790000000),
+            price_at_note: 100.0,
+            title: "Test".to_string(),
+            content: "Test".to_string(),
+            tags: "".to_string(),
+            target_price: None,
+            stop_loss: None,
+            reference_note_ids: vec![],
+        });
+        assert!(unconfigured_res.is_err());
+
         // 1. Create Note 1
         let note1 = db
             .create_note(&CreateNoteInput {
@@ -1303,19 +1383,34 @@ mod tests {
         assert_eq!(note2.id, 2);
         assert_eq!(note2.reference_note_ids, vec![1]);
 
+        // Reject non-existent reference
+        let invalid_ref_res = db.create_note(&CreateNoteInput {
+            symbol: "HDFCBANK.NS".to_string(),
+            timeframe: "15m".to_string(),
+            candle_timestamp: Some(1790003600),
+            price_at_note: 1680.00,
+            title: "Bad Ref".to_string(),
+            content: "Testing bad ref".to_string(),
+            tags: "".to_string(),
+            target_price: None,
+            stop_loss: None,
+            reference_note_ids: vec![9999],
+        });
+        assert!(invalid_ref_res.is_err());
+
         // 3. List notes by symbol
         let hdfc_notes = db.list_notes(Some("HDFCBANK.NS"), None).unwrap();
         assert_eq!(hdfc_notes.len(), 2);
         assert_eq!(hdfc_notes[0].id, 2); // Ordered by created_at DESC
 
-        // 4. Update note 1 (verification / audit)
+        // 4. Update note 1 (verification / audit) - auto-stamps verified_at and clears target_price
         let updated = db
             .update_note(
                 note1.id,
                 &UpdateNoteInput {
                     status: Some("validated".to_string()),
-                    outcome_note: Some("Hit target of 1720 on day 3".to_string()),
-                    verified_at: Some(chrono::Utc::now().timestamp()),
+                    outcome_note: Some(Some("Hit target of 1720 on day 3".to_string())),
+                    target_price: Some(None), // explicitly clear target price
                     ..Default::default()
                 },
             )
@@ -1327,6 +1422,8 @@ mod tests {
             updated.outcome_note.as_deref(),
             Some("Hit target of 1720 on day 3")
         );
+        assert!(updated.target_price.is_none()); // correctly cleared!
+        assert!(updated.verified_at.is_some()); // automatically set!
 
         // 5. Test filtering by status
         let open_notes = db.list_notes(None, Some("open")).unwrap();
