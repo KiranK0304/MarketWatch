@@ -2062,8 +2062,9 @@
         : stocks;
 
       filtered.forEach((s, idx) => {
+        const actualIndex = stocks.findIndex(stock => stock.symbol === s.symbol);
         const li = document.createElement('li');
-        li.className = 'stock-row' + (idx === currentIndex && currentTab === 'universe' ? ' active' : '');
+        li.className = 'stock-row' + (actualIndex === currentIndex && currentTab === 'universe' ? ' active' : '');
         li.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
             <span class="stock-index-badge">${idx + 1}</span>
@@ -2072,13 +2073,17 @@
               <div class="stock-corp-name">${escapeHtml(s.name)}</div>
             </div>
           </div>
-          <button style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px; flex-shrink: 0;" onclick="event.stopPropagation(); deleteStock('${encodeURIComponent(s.symbol)}')">✕</button>
+          <button class="stock-delete-btn" data-symbol="${escapeHtml(s.symbol)}" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px; flex-shrink: 0;">✕</button>
         `;
         li.addEventListener('click', () => {
-          selectStock(idx);
+          selectStock(actualIndex);
           if (currentViewMode === 'grid') {
             setViewMode('single');
           }
+        });
+        li.querySelector('.stock-delete-btn').addEventListener('click', (event) => {
+          event.stopPropagation();
+          deleteStock(s.symbol);
         });
         stockListEl.appendChild(li);
       });
@@ -2113,7 +2118,15 @@
         showToast(`Removed ${symbol}`);
         stocks = stocks.filter(s => s.symbol !== symbol);
         document.getElementById('count-universe').textContent = stocks.length;
+        currentIndex = Math.min(currentIndex, stocks.length - 1);
         renderStockList();
+        if (stocks.length > 0) {
+          if (currentViewMode === 'single') {
+            selectStock(currentIndex);
+          } else {
+            renderMultiChartGrid();
+          }
+        }
       } catch (e) {
         showToast('Error: ' + e.message);
       }
