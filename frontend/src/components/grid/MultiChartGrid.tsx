@@ -66,6 +66,10 @@ const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
         }));
 
         series.setData(formatted);
+        chart.priceScale('right').applyOptions({
+          autoScale: true,
+          scaleMargins: { top: 0.05, bottom: 0.15 },
+        });
         chart.timeScale().fitContent();
 
         const last = candles[candles.length - 1];

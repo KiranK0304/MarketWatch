@@ -2,7 +2,40 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
-import type { Candle, StockNote } from '../../types';
+import type { Candle, StockNote, Timeframe } from '../../types';
+
+// Timeframe-adaptive chart spacing parameters
+export function getTimeframeChartParams(tf: Timeframe, userZoom: number) {
+  let tfMultiplier = 1.0;
+  switch (tf) {
+    case '1w':
+      tfMultiplier = 1.35;
+      break;
+    case '1d':
+      tfMultiplier = 1.2;
+      break;
+    case '1h':
+      tfMultiplier = 1.05;
+      break;
+    case '30m':
+    case '15m':
+      tfMultiplier = 1.0;
+      break;
+    case '5m':
+      tfMultiplier = 0.85;
+      break;
+    default:
+      tfMultiplier = 1.0;
+  }
+
+  const barSpacing = Math.max(1.0, parseFloat((userZoom * tfMultiplier).toFixed(2)));
+  const rightOffset = Math.max(4, Math.round(barSpacing + 3));
+  return {
+    barSpacing,
+    minBarSpacing: 0.5,
+    rightOffset,
+  };
+}
 
 interface FocusChartProps {
   onPriceUpdate?: (price: string, change: { text: string; isPositive: boolean }) => void;
@@ -211,12 +244,26 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
             });
           }
 
-          chartRef.current?.timeScale().fitContent();
-          chartRef.current?.timeScale().applyOptions({
-            barSpacing: zoom,
-            rightOffset: Math.max(3, Math.round(zoom + 2)),
-            minBarSpacing: 0.5,
+          // Force the price scale to re-auto-scale for the new data range.
+          // Top 5% breathing room, bottom 20% reserved for volume overlay.
+          chartRef.current?.priceScale('right').applyOptions({
+            autoScale: true,
+            scaleMargins: {
+              top: 0.05,
+              bottom: 0.2,
+            },
           });
+
+          chartRef.current?.timeScale().fitContent();
+
+          const params = getTimeframeChartParams(timeframe, zoom);
+          chartRef.current?.timeScale().applyOptions({
+            barSpacing: params.barSpacing,
+            rightOffset: params.rightOffset,
+            minBarSpacing: params.minBarSpacing,
+          });
+
+          chartRef.current?.timeScale().scrollToRealTime();
         }
       } catch (err) {
         console.warn('Failed to load candles', err);
@@ -366,13 +413,14 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
+    const params = getTimeframeChartParams(timeframe, zoom);
     chart.timeScale().applyOptions({
-      barSpacing: zoom,
-      rightOffset: Math.max(3, Math.round(zoom + 2)),
-      minBarSpacing: 0.5,
+      barSpacing: params.barSpacing,
+      rightOffset: params.rightOffset,
+      minBarSpacing: params.minBarSpacing,
     });
     updateDotsPosition();
-  }, [zoom, updateDotsPosition]);
+  }, [zoom, timeframe, updateDotsPosition]);
 
   // Handle dot click: open journal drawer & scroll to note
   const handleDotClick = (noteId: number) => {
