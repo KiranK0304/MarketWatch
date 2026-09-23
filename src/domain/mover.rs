@@ -33,10 +33,32 @@ impl StockMover {
         self.change_percent >= 0.0
     }
 
-    /// Returns true if price movement meets or exceeds the given threshold percentage
+    /// Returns true if price movement meets or exceeds the given threshold percentage.
+    ///
+    /// The threshold must be validated with [`validate_threshold`] before use;
+    /// this function uses it as-is (no silent sign-flipping).
     pub fn matches_threshold(&self, threshold_percent: f64) -> bool {
-        self.change_percent.abs() >= threshold_percent.abs()
+        self.change_percent.abs() >= threshold_percent
     }
+}
+
+/// Validate a scan threshold percentage.
+///
+/// Accepts finite values in (0, 100]. Rejects NaN, infinite, zero, negative,
+/// and absurdly large values so callers fail fast instead of silently
+/// scanning with flipped/degenerate semantics.
+pub fn validate_threshold(threshold: f64) -> Result<f64, String> {
+    if !threshold.is_finite() {
+        return Err(format!(
+            "Invalid threshold '{threshold}': must be a finite number in (0, 100]"
+        ));
+    }
+    if threshold <= 0.0 || threshold > 100.0 {
+        return Err(format!(
+            "Invalid threshold '{threshold}': must be in (0, 100]"
+        ));
+    }
+    Ok(threshold)
 }
 
 /// Aggregated result of scanning the stock universe.
@@ -60,6 +82,11 @@ pub struct ScanResult {
     pub movers: Vec<StockMover>,
     /// All scanned stocks with quotes for instant local filtering
     pub all_quotes: Vec<StockMover>,
+    /// Number of universe entries whose quote fetch failed during this scan.
+    /// Failed entries are excluded from `all_quotes`; `total_scanned` still
+    /// reports the configured universe size.
+    #[serde(default)]
+    pub failed_count: usize,
 }
 
 #[cfg(test)]
@@ -97,5 +124,23 @@ mod tests {
 
         assert!(gainer.is_gainer());
         assert!(!loser.is_gainer());
+    }
+
+    #[test]
+    fn test_validate_threshold() {
+        assert_eq!(validate_threshold(3.0), Ok(3.0));
+        assert!(validate_threshold(0.0).is_err());
+        assert!(validate_threshold(-3.0).is_err());
+        assert!(validate_threshold(f64::NAN).is_err());
+        assert!(validate_threshold(f64::INFINITY).is_err());
+        assert!(validate_threshold(101.0).is_err());
+    }
+
+    #[test]
+    fn test_threshold_not_sign_flipped() {
+        // A negative threshold must be rejected at validation, not silently abs()'d.
+        let gainer = make_mover("TATAMOTORS.NS", 3.5);
+        assert!(validate_threshold(-3.0).is_err());
+        assert!(!gainer.matches_threshold(10.0));
     }
 }

@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 use dialoguer::Select;
 
 use crate::domain::Timeframe;
+use crate::domain::mover::validate_threshold;
 
 /// Execution mode for the market terminal.
 #[derive(Debug, PartialEq)]
@@ -103,33 +104,64 @@ impl Cli {
     /// Resolve application execution mode: Web Dashboard, Native Desktop GUI, Scanner, or Service.
     pub fn resolve_mode(&self) -> anyhow::Result<RunMode> {
         if let Some(ref cmd) = self.command {
+            // Global chart/web flags are meaningless alongside subcommands: fail
+            // fast instead of silently discarding them.
+            if self.web || self.timeframe.is_some() || self.symbol.is_some() {
+                anyhow::bail!(
+                    "Global flags (--web/--timeframe/--symbol) cannot be combined with subcommands (scan/service/daemon)."
+                );
+            }
             return match cmd {
                 Commands::Scan {
                     threshold,
                     notify,
                     catchup,
                     popup,
-                } => Ok(RunMode::Scan {
-                    threshold: *threshold,
-                    notify: *notify,
-                    catchup: *catchup,
-                    popup: *popup,
-                }),
-                Commands::Service { action, threshold } => Ok(RunMode::Service {
-                    action: action.clone(),
-                    threshold: *threshold,
-                }),
-                Commands::Daemon { threshold } => Ok(RunMode::Daemon {
-                    threshold: *threshold,
-                }),
+                } => {
+                    let threshold =
+                        validate_threshold(*threshold).map_err(|e| anyhow::anyhow!("{e}"))?;
+                    Ok(RunMode::Scan {
+                        threshold,
+                        notify: *notify,
+                        catchup: *catchup,
+                        popup: *popup,
+                    })
+                }
+                Commands::Service { action, threshold } => {
+                    if !["install", "uninstall", "status"].contains(&action.as_str()) {
+                        anyhow::bail!(
+                            "Unknown service action '{action}'. Valid actions: install, uninstall, status."
+                        );
+                    }
+                    let threshold =
+                        validate_threshold(*threshold).map_err(|e| anyhow::anyhow!("{e}"))?;
+                    Ok(RunMode::Service {
+                        action: action.clone(),
+                        threshold,
+                    })
+                }
+                Commands::Daemon { threshold } => {
+                    let threshold =
+                        validate_threshold(*threshold).map_err(|e| anyhow::anyhow!("{e}"))?;
+                    Ok(RunMode::Daemon { threshold })
+                }
             };
         }
 
         if self.web {
+            if self.port == 0 {
+                anyhow::bail!("Invalid --port 0: must be 1-65535.");
+            }
             return Ok(RunMode::WebDashboard {
                 port: self.port,
                 open_browser: !self.no_browser,
             });
+        }
+
+        if let Some(ref sym) = self.symbol
+            && sym.trim().is_empty()
+        {
+            anyhow::bail!("Empty --symbol provided. Omit -s to use the first stock.");
         }
 
         match &self.timeframe {

@@ -40,29 +40,70 @@ pub struct ScanState {
 
 impl ScanState {
     /// Load state from JSON file or return default.
+    ///
+    /// A corrupt file is never silently discarded: it is renamed to
+    /// `<name>.corrupt-<timestamp>` for inspection and a default is returned.
     pub fn load(path: &Path) -> Self {
         if !path.exists() {
             return Self::default();
         }
 
         match std::fs::read_to_string(path) {
-            Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
-            Err(_) => Self::default(),
+            Ok(content) => match serde_json::from_str(&content) {
+                Ok(state) => state,
+                Err(e) => {
+                    let backup =
+                        path.with_extension(format!("corrupt-{}", chrono::Utc::now().timestamp()));
+                    if std::fs::rename(path, &backup).is_ok() {
+                        eprintln!(
+                            "Warning: scan state '{}' was corrupt ({e}); moved to '{}' and starting fresh.",
+                            path.display(),
+                            backup.display()
+                        );
+                    } else {
+                        eprintln!(
+                            "Warning: scan state '{}' is corrupt ({e}); starting fresh.",
+                            path.display()
+                        );
+                    }
+                    Self::default()
+                }
+            },
+            Err(e) => {
+                eprintln!(
+                    "Warning: cannot read scan state '{}' ({e}); starting fresh.",
+                    path.display()
+                );
+                Self::default()
+            }
         }
     }
 
-    /// Save state to JSON file.
+    /// Save state to JSON file atomically (tmp file + rename + fsync).
     pub fn save(&self, path: &Path) -> Result<(), MarketError> {
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent).map_err(|e| {
+                MarketError::Config(format!(
+                    "Failed to create state dir '{}': {e}",
+                    parent.display()
+                ))
+            })?;
         }
 
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| MarketError::Config(format!("Failed to serialize scan state: {e}")))?;
 
-        std::fs::write(path, json).map_err(|e| {
+        let tmp_path = path.with_extension("tmp");
+        std::fs::write(&tmp_path, json).map_err(|e| {
             MarketError::Config(format!(
                 "Failed to write state to '{}': {e}",
+                tmp_path.display()
+            ))
+        })?;
+        std::fs::rename(&tmp_path, path).map_err(|e| {
+            let _ = std::fs::remove_file(&tmp_path);
+            MarketError::Config(format!(
+                "Failed to persist state to '{}': {e}",
                 path.display()
             ))
         })?;

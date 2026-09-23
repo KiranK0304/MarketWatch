@@ -216,8 +216,10 @@ impl MarketCalendar {
     /// instead of `11:30:00`.
     pub fn align_timestamp(ts: i64, tf: Timeframe) -> i64 {
         let offset = ist_offset();
+        // Invalid timestamps fall back to "now" so they land in the current
+        // session instead of a bogus 1970 slot that poisons gap detection.
         let dt_ist = DateTime::from_timestamp(ts, 0)
-            .unwrap_or_default()
+            .unwrap_or_else(chrono::Utc::now)
             .with_timezone(&offset);
 
         let date = dt_ist.date_naive();
@@ -363,17 +365,19 @@ impl MarketCalendar {
 
     /// Enumerate all expected slot timestamps between `start_ts` and `end_ts` (inclusive).
     pub fn expected_slots_between(start_ts: i64, end_ts: i64, tf: Timeframe) -> Vec<i64> {
-        if start_ts > end_ts {
+        if start_ts > end_ts || start_ts <= 0 || end_ts <= 0 {
             return Vec::new();
         }
 
         let offset = ist_offset();
-        let start_dt = DateTime::from_timestamp(start_ts, 0)
-            .unwrap_or_default()
-            .with_timezone(&offset);
-        let end_dt = DateTime::from_timestamp(end_ts, 0)
-            .unwrap_or_default()
-            .with_timezone(&offset);
+        let (Some(start_dt), Some(end_dt)) = (
+            DateTime::from_timestamp(start_ts, 0),
+            DateTime::from_timestamp(end_ts, 0),
+        ) else {
+            return Vec::new();
+        };
+        let start_dt = start_dt.with_timezone(&offset);
+        let end_dt = end_dt.with_timezone(&offset);
 
         let mut current_date = start_dt.date_naive();
         let end_date = end_dt.date_naive();

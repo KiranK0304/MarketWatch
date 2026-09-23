@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::config::{self, StockConfig};
-use crate::domain::Timeframe;
+use crate::domain::{Timeframe, mover::validate_threshold};
 use crate::provider::MarketDataProvider;
 use crate::provider::yahoo::YahooProvider;
 use crate::scanner::{
@@ -55,6 +55,7 @@ pub async fn run_scan(
     catchup: bool,
     popup: bool,
 ) -> anyhow::Result<()> {
+    let threshold = validate_threshold(threshold).map_err(|e| anyhow::anyhow!("{e}"))?;
     let state_path = ScanState::default_path();
     let mut state = ScanState::load(&state_path);
     let ist_now = now_ist();
@@ -92,9 +93,11 @@ pub async fn run_scan(
 
         let provider = Arc::new(YahooProvider::new()?);
         let scanner = Scanner::new(provider);
+        // A fully-failed sweep is an error (engine) and never recorded;
+        // partial failures still record, with the count visible below.
         let result = scanner.scan(&stock_config.stocks, threshold).await?;
 
-        print_scan_result(&result, threshold);
+        print_scan_result(&result);
 
         if let Some(slot) = slot {
             let today_str = ist_now.format("%Y-%m-%d").to_string();
@@ -116,7 +119,8 @@ pub async fn run_scan(
     Ok(())
 }
 
-fn print_scan_result(result: &crate::domain::ScanResult, threshold: f64) {
+fn print_scan_result(result: &crate::domain::ScanResult) {
+    let threshold = result.threshold_percent;
     println!("\n╔════════════════════════════════════════════════════════════════════════╗");
     println!("║                 MarketWatch Stock Universe Scan Result                 ║");
     println!("╠════════════════════════════════════════════════════════════════════════╣");
@@ -125,8 +129,16 @@ fn print_scan_result(result: &crate::domain::ScanResult, threshold: f64) {
     println!(
         "║ Scanned:   {:<59} ║",
         format!(
-            "{} stocks ({} movers, {} gainers, {} losers)",
-            result.total_scanned, result.movers_count, result.gainers_count, result.losers_count
+            "{} stocks ({} movers, {} gainers, {} losers{})",
+            result.total_scanned,
+            result.movers_count,
+            result.gainers_count,
+            result.losers_count,
+            if result.failed_count > 0 {
+                format!(", {} failed", result.failed_count)
+            } else {
+                String::new()
+            }
         )
     );
     println!("╚════════════════════════════════════════════════════════════════════════╝\n");
@@ -158,6 +170,7 @@ fn print_scan_result(result: &crate::domain::ScanResult, threshold: f64) {
 
 /// Run continuous background daemon.
 pub async fn run_daemon(threshold: f64) -> anyhow::Result<()> {
+    let threshold = validate_threshold(threshold).map_err(|e| anyhow::anyhow!("{e}"))?;
     println!("\n╔════════════════════════════════════════════════════════════════════════╗");
     println!("║       MarketWatch Background Daemon is Running!                        ║");
     println!("╠════════════════════════════════════════════════════════════════════════╣");
@@ -181,9 +194,31 @@ pub async fn run_daemon(threshold: f64) -> anyhow::Result<()> {
                 slot.label()
             );
 
-            let config_path = find_config_path()?;
-            let stock_config = config::load_stock_config(&config_path)?;
-            let provider = Arc::new(YahooProvider::new()?);
+            // Per-iteration failures must not kill the daemon: log, back off, retry.
+            let config_path = match find_config_path() {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("Daemon config error (retrying in 60s): {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    continue;
+                }
+            };
+            let stock_config = match config::load_stock_config(&config_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Daemon config error (retrying in 60s): {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    continue;
+                }
+            };
+            let provider = match YahooProvider::new() {
+                Ok(p) => Arc::new(p),
+                Err(e) => {
+                    eprintln!("Daemon provider error (retrying in 60s): {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    continue;
+                }
+            };
             let scanner = Scanner::new(provider);
 
             match scanner.scan(&stock_config.stocks, threshold).await {
@@ -202,7 +237,10 @@ pub async fn run_daemon(threshold: f64) -> anyhow::Result<()> {
                     send_desktop_notification(&result, Some(slot.label()));
                 }
                 Err(e) => {
-                    eprintln!("Scan error: {e}");
+                    // Fully-failed sweeps are not recorded (see engine); back off
+                    // before the next attempt instead of hot-looping every 30s.
+                    eprintln!("Scan error (slot not recorded, retrying in 60s): {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
                 }
             }
         }
@@ -214,7 +252,10 @@ pub async fn run_daemon(threshold: f64) -> anyhow::Result<()> {
 /// Run service command.
 pub fn run_service(action: &str, threshold: f64) -> anyhow::Result<()> {
     match action {
-        "install" => ServiceManager::install(threshold),
+        "install" => {
+            let threshold = validate_threshold(threshold).map_err(|e| anyhow::anyhow!("{e}"))?;
+            ServiceManager::install(threshold)
+        }
         "uninstall" => ServiceManager::uninstall(),
         "status" => {
             ServiceManager::status();
@@ -262,7 +303,10 @@ fn resolve_stock<'a>(
 ) -> anyhow::Result<&'a config::StockEntry> {
     match symbol_arg {
         Some(sym) => {
-            let upper = sym.to_uppercase();
+            let upper = sym.trim().to_uppercase();
+            if upper.is_empty() {
+                anyhow::bail!("Empty --symbol provided. Omit -s to use the first stock.");
+            }
             config
                 .stocks
                 .iter()
@@ -272,11 +316,13 @@ fn resolve_stock<'a>(
                         config.stocks.iter().map(|s| s.symbol.as_str()).collect();
                     anyhow::anyhow!(
                         "Symbol '{}' not found in stock universe.\nAvailable: {:?}",
-                        sym,
+                        sym.trim(),
                         &available[..available.len().min(10)]
                     )
                 })
         }
-        None => Ok(&config.stocks[0]),
+        None => config.stocks.first().ok_or_else(|| {
+            anyhow::anyhow!("Stock universe is empty. Add at least one [[stocks]] entry.")
+        }),
     }
 }

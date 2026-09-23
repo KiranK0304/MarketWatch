@@ -40,19 +40,60 @@ pub fn load_stock_config(path: &Path) -> Result<StockConfig, MarketError> {
         ));
     }
 
+    validate_stock_config(&config)?;
+
     Ok(config)
+}
+
+/// Validate every universe entry: non-blank trimmed symbol/name and no
+/// case-insensitive duplicate symbols (which would cause double-scanning).
+pub fn validate_stock_config(config: &StockConfig) -> Result<(), MarketError> {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    for (i, entry) in config.stocks.iter().enumerate() {
+        if entry.symbol.trim().is_empty() {
+            return Err(MarketError::Config(format!(
+                "stocks[{i}]: symbol is empty or blank"
+            )));
+        }
+        if entry.name.trim().is_empty() {
+            return Err(MarketError::Config(format!(
+                "stocks[{i}] ({}): name is empty or blank",
+                entry.symbol.trim()
+            )));
+        }
+        let key = entry.symbol.trim().to_uppercase();
+        if !seen.insert(key) {
+            return Err(MarketError::Config(format!(
+                "stocks[{i}]: duplicate symbol '{}'",
+                entry.symbol.trim()
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Save the stock configuration to a TOML file.
 ///
-/// # Errors
-/// Returns `MarketError::Config` if serialization or writing fails.
+/// Validates before writing and writes atomically (tmp file + rename) so a
+/// crash can never leave a truncated universe file behind.
 pub fn save_stock_config(path: &Path, config: &StockConfig) -> Result<(), MarketError> {
+    validate_stock_config(config)?;
+
     let toml_str = toml::to_string_pretty(config)
         .map_err(|e| MarketError::Config(format!("Failed to serialize stock config: {e}")))?;
 
-    std::fs::write(path, toml_str).map_err(|e| {
-        MarketError::Config(format!("Failed to write to '{}': {}", path.display(), e))
+    let tmp_path = path.with_extension("tmp");
+    std::fs::write(&tmp_path, toml_str).map_err(|e| {
+        MarketError::Config(format!(
+            "Failed to write to '{}': {}",
+            tmp_path.display(),
+            e
+        ))
+    })?;
+    std::fs::rename(&tmp_path, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp_path);
+        MarketError::Config(format!("Failed to persist to '{}': {}", path.display(), e))
     })?;
 
     Ok(())

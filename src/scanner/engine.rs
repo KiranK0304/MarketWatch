@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::config::StockEntry;
-use crate::domain::{ScanResult, StockMover};
+use crate::domain::{ScanResult, StockMover, mover::validate_threshold};
 use crate::error::MarketError;
 use crate::provider::yahoo::YahooProvider;
 
@@ -26,11 +26,21 @@ impl Scanner {
     }
 
     /// Scan the stock universe and filter movers meeting or exceeding `threshold_percent`.
+    ///
+    /// Returns an error if the threshold is invalid or if *every* quote fetch
+    /// failed (so callers never record a fully-failed sweep as complete).
     pub async fn scan(
         &self,
         stocks: &[StockEntry],
         threshold_percent: f64,
     ) -> Result<ScanResult, MarketError> {
+        let threshold_percent =
+            validate_threshold(threshold_percent).map_err(MarketError::InvalidInput)?;
+        if stocks.is_empty() {
+            return Err(MarketError::NoData {
+                symbol: "<empty universe>".to_string(),
+            });
+        }
         let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS));
         let mut handles = Vec::with_capacity(stocks.len());
 
@@ -55,10 +65,24 @@ impl Scanner {
         }
 
         let mut all_quotes = Vec::with_capacity(stocks.len());
+        let mut failed_count = 0usize;
         for handle in handles {
-            if let Ok(Some(mover)) = handle.await {
-                all_quotes.push(mover);
+            match handle.await {
+                Ok(Some(mover)) => all_quotes.push(mover),
+                // Covers provider failures (None) and task panics/cancellation (Err).
+                _ => failed_count += 1,
             }
+        }
+
+        if all_quotes.is_empty() {
+            return Err(MarketError::Provider {
+                status: 0,
+                symbol: format!("{} stocks", stocks.len()),
+                body: format!(
+                    "All {0} quote fetches failed; slot not recorded, retry later",
+                    stocks.len()
+                ),
+            });
         }
 
         let now = chrono::Utc::now();
@@ -108,6 +132,7 @@ impl Scanner {
             losers_count,
             movers,
             all_quotes,
+            failed_count,
         })
     }
 }

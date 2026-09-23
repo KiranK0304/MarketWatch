@@ -52,7 +52,14 @@ impl fmt::Display for MarketError {
                 symbol,
                 body,
             } => {
-                write!(f, "Provider error: HTTP {status} for '{symbol}': {body}")
+                // Truncate potentially huge HTML bodies so CLI output stays readable.
+                const MAX_BODY: usize = 300;
+                let snippet = if body.len() > MAX_BODY {
+                    format!("{}… ({} bytes total)", &body[..MAX_BODY], body.len())
+                } else {
+                    body.clone()
+                };
+                write!(f, "Provider error: HTTP {status} for '{symbol}': {snippet}")
             }
             MarketError::InvalidSymbol(s) => write!(f, "Invalid symbol: '{s}'"),
             MarketError::Config(msg) => write!(f, "Configuration error: {msg}"),
