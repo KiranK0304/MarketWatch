@@ -987,6 +987,205 @@
       color: white;
     }
 
+    /* Note Modal (Log / Edit / Audit) */
+    .note-modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 480px;
+      max-width: 92vw;
+      max-height: 88vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05);
+    }
+    .note-modal-sm { width: 420px; }
+
+    .note-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .note-modal-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .note-modal-icon { font-size: 18px; }
+    .note-modal-title { font-weight: 700; font-size: 15px; color: var(--text-primary); }
+    .note-modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 0 2px;
+      line-height: 1;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .note-modal-close:hover { color: var(--text-primary); }
+
+    .note-modal-context {
+      display: flex;
+      gap: 6px;
+      padding: 12px 20px;
+      flex-wrap: wrap;
+    }
+    .note-ctx-chip {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      min-width: 80px;
+    }
+    .note-ctx-label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+    .note-ctx-value {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+
+    .note-modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px 20px;
+    }
+
+    .note-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .note-field-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .note-required { color: var(--bearish); }
+    .note-field-input {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--font-sans);
+      outline: none;
+      width: 100%;
+      box-sizing: border-box;
+      transition: border-color 0.15s;
+    }
+    .note-field-input:focus { border-color: var(--accent); }
+    .note-field-textarea {
+      resize: vertical;
+      line-height: 1.5;
+      min-height: 72px;
+    }
+    .note-field-select {
+      height: 60px;
+      font-size: 11px;
+    }
+    .note-field-hint {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .note-field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .note-modal-footer {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      padding: 12px 20px 16px;
+      border-top: 1px solid var(--border);
+    }
+    .note-btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      font-family: var(--font-sans);
+      transition: all 0.15s;
+    }
+    .note-btn-cancel {
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+    }
+    .note-btn-cancel:hover { background: var(--bg-hover); }
+    .note-btn-save {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .note-btn-save:hover { filter: brightness(1.1); }
+
+    .audit-note-summary {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .audit-note-name {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+    .audit-note-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+
+    /* Note Indicator Strip (below chart x-axis) */
+    .note-indicator-strip {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 18px;
+      z-index: 12;
+      pointer-events: none;
+    }
+    .note-dot {
+      position: absolute;
+      bottom: 4px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 0 0 1.5px var(--bg-surface);
+    }
+    .note-dot:hover {
+      transform: scale(1.6);
+      box-shadow: 0 0 0 2px var(--bg-surface), 0 0 6px currentColor;
+      z-index: 15;
+    }
+    .note-dot.open  { background: #818cf8; color: #818cf8; }
+    .note-dot.validated { background: #16a34a; color: #16a34a; }
+    .note-dot.invalidated { background: #dc2626; color: #dc2626; }
+
     /* 5. Bottom Status Strip */
     .status-strip {
       height: 26px;
@@ -1430,91 +1629,98 @@
 
   <!-- 8. Log / Edit Analysis Note Modal -->
   <div class="modal-backdrop" id="modal-note">
-    <div class="modal-card" style="width: 500px; max-width: 90vw; max-height: 85vh; overflow-y: auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-        <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-          <span>📝</span>
-          <span id="note-modal-title">Log Analysis Note</span>
+    <div class="note-modal">
+      <div class="note-modal-header">
+        <div class="note-modal-title-row">
+          <span class="note-modal-icon">📝</span>
+          <span class="note-modal-title" id="note-modal-title">Log Analysis Note</span>
         </div>
-        <button id="btn-close-note-modal" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+        <button class="note-modal-close" id="btn-close-note-modal">&times;</button>
       </div>
 
-      <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); background: var(--bg-hover); padding: 8px 10px; border-radius: 6px; margin: 10px 0; flex-wrap: wrap;">
-        <div>Symbol: <strong id="note-meta-sym" style="color: var(--text-main);">--</strong></div>
-        <div>Timeframe: <strong id="note-meta-tf" style="color: var(--text-main);">--</strong></div>
-        <div>Price: <strong id="note-meta-price" style="color: var(--text-main);">--</strong></div>
+      <div class="note-modal-context">
+        <div class="note-ctx-chip"><span class="note-ctx-label">Symbol</span><span class="note-ctx-value" id="note-meta-sym">--</span></div>
+        <div class="note-ctx-chip"><span class="note-ctx-label">Timeframe</span><span class="note-ctx-value" id="note-meta-tf">--</span></div>
+        <div class="note-ctx-chip"><span class="note-ctx-label">Price</span><span class="note-ctx-value" id="note-meta-price">--</span></div>
         <input type="hidden" id="note-input-candle-ts" />
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <div>
-          <label style="font-size: 11px; color: var(--text-muted);">Title / Setup Headline *</label>
-          <input type="text" class="modal-input" id="note-input-title" placeholder="e.g. Bullish momentum breakout above 200 EMA">
-        </div>
-        <div>
-          <label style="font-size: 11px; color: var(--text-muted);">Thesis & Technical Observations *</label>
-          <textarea class="modal-input" id="note-input-content" rows="4" placeholder="Volume surge, RSI divergence, support level holding..." style="resize: vertical; font-family: inherit; line-height: 1.4;"></textarea>
+      <div class="note-modal-body">
+        <div class="note-field">
+          <label class="note-field-label">Title / Setup Headline <span class="note-required">*</span></label>
+          <input type="text" class="note-field-input" id="note-input-title" placeholder="e.g. Bullish momentum breakout above 200 EMA">
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <div>
-            <label style="font-size: 11px; color: var(--text-muted);">Target Price (₹, optional)</label>
-            <input type="number" step="0.05" class="modal-input" id="note-input-target" placeholder="e.g. 1720.00">
+        <div class="note-field">
+          <label class="note-field-label">Thesis & Technical Observations <span class="note-required">*</span></label>
+          <textarea class="note-field-input note-field-textarea" id="note-input-content" rows="4" placeholder="Volume surge, RSI divergence, support level holding..."></textarea>
+        </div>
+
+        <div class="note-field-row">
+          <div class="note-field">
+            <label class="note-field-label">Target Price (₹)</label>
+            <input type="number" step="0.05" class="note-field-input" id="note-input-target" placeholder="1720.00">
           </div>
-          <div>
-            <label style="font-size: 11px; color: var(--text-muted);">Stop Loss (₹, optional)</label>
-            <input type="number" step="0.05" class="modal-input" id="note-input-stop" placeholder="e.g. 1610.00">
+          <div class="note-field">
+            <label class="note-field-label">Stop Loss (₹)</label>
+            <input type="number" step="0.05" class="note-field-input" id="note-input-stop" placeholder="1610.00">
           </div>
         </div>
 
-        <div>
-          <label style="font-size: 11px; color: var(--text-muted);">Tags (comma-separated)</label>
-          <input type="text" class="modal-input" id="note-input-tags" placeholder="e.g. momentum, breakout, resistance">
+        <div class="note-field">
+          <label class="note-field-label">Tags</label>
+          <input type="text" class="note-field-input" id="note-input-tags" placeholder="momentum, breakout, resistance">
         </div>
 
-        <div>
-          <label style="font-size: 11px; color: var(--text-muted);">Link Previous Notes (References)</label>
-          <select id="note-input-refs" multiple class="modal-input" style="height: 65px; font-size: 11px;"></select>
-          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Hold Ctrl/Cmd to select multiple referenced notes</div>
+        <div class="note-field">
+          <label class="note-field-label">Link Previous Notes</label>
+          <select id="note-input-refs" multiple class="note-field-input note-field-select"></select>
+          <span class="note-field-hint">Ctrl/Cmd+click to select multiple</span>
         </div>
       </div>
 
-      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px;">
-        <button class="top-action-btn" id="btn-cancel-note">Cancel</button>
-        <button class="top-action-btn active" id="btn-save-note">Save Note</button>
+      <div class="note-modal-footer">
+        <button class="note-btn note-btn-cancel" id="btn-cancel-note">Cancel</button>
+        <button class="note-btn note-btn-save" id="btn-save-note">Save Note</button>
       </div>
     </div>
   </div>
 
   <!-- 9. Audit / Verify Outcome Modal -->
   <div class="modal-backdrop" id="modal-audit-note">
-    <div class="modal-card" style="width: 440px; max-width: 90vw;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-        <div style="font-weight: 700; font-size: 14px;">Verify / Audit Setup Outcome</div>
-        <button id="btn-close-audit-modal" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+    <div class="note-modal note-modal-sm">
+      <div class="note-modal-header">
+        <div class="note-modal-title-row">
+          <span class="note-modal-icon">⚖️</span>
+          <span class="note-modal-title">Verify Outcome</span>
+        </div>
+        <button class="note-modal-close" id="btn-close-audit-modal">&times;</button>
       </div>
       <input type="hidden" id="audit-note-id" />
-      <div style="margin: 10px 0;">
-        <div style="font-weight: 600; font-size: 13px;" id="audit-note-title">--</div>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="audit-note-subtitle">--</div>
+
+      <div class="audit-note-summary">
+        <div class="audit-note-name" id="audit-note-title">--</div>
+        <div class="audit-note-meta" id="audit-note-subtitle">--</div>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <div>
-          <label style="font-size: 11px; color: var(--text-muted);">Outcome Status</label>
-          <select id="audit-status" class="modal-input">
+
+      <div class="note-modal-body">
+        <div class="note-field">
+          <label class="note-field-label">Outcome Status</label>
+          <select id="audit-status" class="note-field-input">
             <option value="validated">✅ Validated (Hit Target / Worked)</option>
             <option value="invalidated">❌ Invalidated (Hit Stop Loss / Failed)</option>
             <option value="open">⏳ Pending / Keep Open</option>
           </select>
         </div>
-        <div>
-          <label style="font-size: 11px; color: var(--text-muted);">Outcome Retrospective Note</label>
-          <textarea id="audit-outcome-note" class="modal-input" rows="3" placeholder="What happened? Did momentum hold? What did we learn?"></textarea>
+        <div class="note-field">
+          <label class="note-field-label">Retrospective Note</label>
+          <textarea id="audit-outcome-note" class="note-field-input note-field-textarea" rows="3" placeholder="What happened? Did momentum hold? What did we learn?"></textarea>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;">
-        <button class="top-action-btn" id="btn-cancel-audit">Cancel</button>
-        <button class="top-action-btn active" id="btn-save-audit">Update Outcome</button>
+
+      <div class="note-modal-footer">
+        <button class="note-btn note-btn-cancel" id="btn-cancel-audit">Cancel</button>
+        <button class="note-btn note-btn-save" id="btn-save-audit">Update Outcome</button>
       </div>
     </div>
   </div>
