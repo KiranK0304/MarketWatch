@@ -49,7 +49,7 @@ impl SyncStatus {
     }
 }
 
-type CacheKey = (String, &'static str);
+type CacheKey = (String, &'static str, bool);
 type InFlightResult = Result<(), String>;
 
 /// Central coordinator for candle synchronization across all application callers.
@@ -98,7 +98,9 @@ impl CandleSyncService {
     ) -> Result<(Vec<Candle>, SyncStatus), MarketError> {
         let sym_upper = symbol.trim().to_uppercase();
         let tf_label = timeframe.label();
-        let key = (sym_upper.clone(), tf_label);
+        // Forced refreshes must not join a normal request, otherwise a manual
+        // refresh could return data fetched under the normal cache policy.
+        let key = (sym_upper.clone(), tf_label, force);
 
         // 1. Check in-flight registry for duplicate concurrent calls
         let mut rx = {
