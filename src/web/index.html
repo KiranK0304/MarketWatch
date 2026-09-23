@@ -1794,6 +1794,7 @@
     let gridPageSize = 24;
     let journalFilterScope = 'stock'; // 'stock' | 'all'
     let journalFilterStatus = 'all'; // 'all' | 'open' | 'validated' | 'invalidated'
+    let journalRenderGen = 0;
 
     // Elements
     const sidebar = document.getElementById('sidebar');
@@ -2778,12 +2779,22 @@
         if (!strip || notes.length === 0) return;
 
         const timeScale = chart.timeScale();
+        const minChartTime = candleData[0].timestamp;
+        const maxChartTime = candleData[candleData.length - 1].timestamp;
+        const candleInterval = candleData.length > 1
+          ? (candleData[1].timestamp - candleData[0].timestamp)
+          : 900;
 
-        for (const note of notes) {
-          let ts = note.candle_timestamp || note.created_at;
-          if (!ts) continue;
+        // Filter notes within chart time range (allowing 1 candle buffer on either side)
+        const visibleNotes = notes.filter(n => {
+          const ts = n.candle_timestamp || n.created_at;
+          return ts && ts >= (minChartTime - candleInterval) && ts <= (maxChartTime + candleInterval);
+        });
 
-          // Snap to nearest candle timestamp
+        for (const note of visibleNotes) {
+          const ts = note.candle_timestamp || note.created_at;
+
+          // Snap to nearest candle within reasonable tolerance
           let snapTs = candleData[0].timestamp;
           let minDiff = Math.abs(candleData[0].timestamp - ts);
           for (let i = 1; i < candleData.length; i++) {
@@ -2794,13 +2805,21 @@
             }
           }
 
+          // Do not map note if it's more than 3 candle intervals away
+          if (minDiff > candleInterval * 3) continue;
+
           const xCoord = timeScale.timeToCoordinate(snapTs);
           if (xCoord === null || xCoord < 0) continue;
 
+          const cleanStatus = ['open', 'validated', 'invalidated', 'cancelled'].includes(note.status)
+            ? note.status
+            : 'open';
+
           const dot = document.createElement('div');
-          dot.className = `note-dot ${note.status}`;
+          dot.className = `note-dot ${cleanStatus}`;
           dot.style.left = `${xCoord - 3.5}px`;
-          dot.title = `#${note.id}: ${note.title}`;
+          dot.title = `#${note.id}: ${note.title} (${note.timeframe})`;
+          dot.dataset.noteId = String(note.id);
           dot.addEventListener('click', (e) => {
             e.stopPropagation();
             openNoteInJournal(note.id);
@@ -2811,10 +2830,11 @@
         // Re-position dots when chart scrolls/zooms
         const repositionDots = () => {
           const dots = strip.querySelectorAll('.note-dot');
-          let dotIdx = 0;
-          for (const note of notes) {
-            let ts = note.candle_timestamp || note.created_at;
-            if (!ts) continue;
+          dots.forEach(dot => {
+            const noteId = parseInt(dot.dataset.noteId, 10);
+            const note = visibleNotes.find(n => n.id === noteId);
+            if (!note) return;
+            const ts = note.candle_timestamp || note.created_at;
 
             let snapTs = candleData[0].timestamp;
             let minD = Math.abs(candleData[0].timestamp - ts);
@@ -2823,17 +2843,14 @@
               if (d < minD) { minD = d; snapTs = candleData[i].timestamp; }
             }
 
-            if (dotIdx < dots.length) {
-              const x = timeScale.timeToCoordinate(snapTs);
-              if (x !== null && x >= 0) {
-                dots[dotIdx].style.left = `${x - 3.5}px`;
-                dots[dotIdx].style.display = '';
-              } else {
-                dots[dotIdx].style.display = 'none';
-              }
-              dotIdx++;
+            const x = timeScale.timeToCoordinate(snapTs);
+            if (x !== null && x >= 0) {
+              dot.style.left = `${x - 3.5}px`;
+              dot.style.display = '';
+            } else {
+              dot.style.display = 'none';
             }
-          }
+          });
         };
 
         timeScale.subscribeVisibleTimeRangeChange(repositionDots);
@@ -2918,10 +2935,15 @@
         });
       });
 
+      const currentGen = ++journalRenderGen;
+
       try {
         const res = await fetch(url);
+        if (currentGen !== journalRenderGen) return;
         if (!res.ok) throw new Error('Failed to load notes');
         const notes = await res.json();
+        if (currentGen !== journalRenderGen) return;
+
         const listEl = document.getElementById('journal-notes-list');
         if (!listEl) return;
 
@@ -2961,7 +2983,7 @@
               <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
                 <span style="font-size: 10px; color: var(--text-muted);">Refs:</span>
                 ${note.reference_note_ids.map(rid => `
-                  <a class="journal-ref-link" onclick="navigateToNote(${rid})" title="Jump to Note #${rid}">↳ Ref #${rid}</a>
+                  <a class="journal-ref-link btn-ref-jump" data-ref-id="${rid}" title="Jump to Note #${rid}">↳ Ref #${rid}</a>
                 `).join('')}
               </div>
             `;
@@ -2991,12 +3013,16 @@
             `;
           }
 
+          const cleanStatus = ['open', 'validated', 'invalidated', 'cancelled'].includes(note.status)
+            ? note.status
+            : 'open';
+
           card.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <a style="font-weight: 700; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: none;" onclick="switchStockBySymbol('${escapeHtml(note.symbol)}')">${escapeHtml(note.symbol)}</a>
+                <a class="journal-stock-link" data-symbol="${escapeHtml(note.symbol)}" style="font-weight: 700; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: none;">${escapeHtml(note.symbol)}</a>
                 <span style="font-size: 10px; color: var(--text-muted); background: var(--bg-hover); padding: 1px 4px; border-radius: 3px;">${escapeHtml(note.timeframe)}</span>
-                <span class="journal-status-pill ${note.status}">${note.status}</span>
+                <span class="journal-status-pill ${cleanStatus}">${escapeHtml(note.status)}</span>
               </div>
               <span style="font-size: 10px; color: var(--text-muted); white-space: nowrap;">${dateStr}</span>
             </div>
@@ -3017,18 +3043,52 @@
             ${outcomeHtml}
 
             <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 6px; margin-top: 4px;">
-              <button class="top-action-btn" style="font-size: 10px; padding: 2px 6px;" onclick="openAuditModalById(${note.id})">
+              <button class="top-action-btn btn-audit-trigger" data-id="${note.id}" style="font-size: 10px; padding: 2px 6px;">
                 ${note.status === 'open' ? '⚖️ Verify Outcome' : '✏️ Edit Outcome'}
               </button>
               <div style="display: flex; gap: 4px;">
-                <button class="top-action-btn" style="font-size: 10px; padding: 2px 6px;" onclick="openEditNoteModalById(${note.id})">Edit</button>
-                <button class="top-action-btn" style="font-size: 10px; padding: 2px 6px; color: var(--bearish);" onclick="deleteNote(${note.id})">Delete</button>
+                <button class="top-action-btn btn-edit-trigger" data-id="${note.id}" style="font-size: 10px; padding: 2px 6px;">Edit</button>
+                <button class="top-action-btn btn-delete-trigger" data-id="${note.id}" style="font-size: 10px; padding: 2px 6px; color: var(--bearish);">Delete</button>
               </div>
             </div>
           `;
           listEl.appendChild(card);
         });
+
+        // Event delegation for card action clicks (eliminates inline onclick string interpolation)
+        listEl.addEventListener('click', (e) => {
+          const stockLink = e.target.closest('.journal-stock-link');
+          if (stockLink && stockLink.dataset.symbol) {
+            switchStockBySymbol(stockLink.dataset.symbol);
+            return;
+          }
+          const refLink = e.target.closest('.btn-ref-jump');
+          if (refLink && refLink.dataset.refId) {
+            const rid = parseInt(refLink.dataset.refId, 10);
+            navigateToNote(rid);
+            return;
+          }
+          const auditBtn = e.target.closest('.btn-audit-trigger');
+          if (auditBtn && auditBtn.dataset.id) {
+            const id = parseInt(auditBtn.dataset.id, 10);
+            openAuditModalById(id);
+            return;
+          }
+          const editBtn = e.target.closest('.btn-edit-trigger');
+          if (editBtn && editBtn.dataset.id) {
+            const id = parseInt(editBtn.dataset.id, 10);
+            openEditNoteModalById(id);
+            return;
+          }
+          const delBtn = e.target.closest('.btn-delete-trigger');
+          if (delBtn && delBtn.dataset.id) {
+            const id = parseInt(delBtn.dataset.id, 10);
+            deleteNote(id);
+            return;
+          }
+        });
       } catch (e) {
+        if (currentGen !== journalRenderGen) return;
         const listEl = document.getElementById('journal-notes-list');
         if (listEl) {
           listEl.innerHTML = `<div style="color: var(--bearish); font-size: 12px;">Failed to load journal notes: ${escapeHtml(e.message)}</div>`;
