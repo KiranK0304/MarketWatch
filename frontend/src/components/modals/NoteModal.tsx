@@ -82,6 +82,22 @@ export const NoteModal: React.FC = () => {
       showToast('Wait for the active stock chart to finish loading');
       return;
     }
+    // Reject non-numeric prices client-side: parseFloat("abc") is NaN, which
+    // JSON.stringify turns into null — silently dropping the user's input.
+    const parseOptionalPrice = (raw: string, field: string): number | null | undefined => {
+      const t = raw.trim();
+      if (!t) return null;
+      const v = parseFloat(t);
+      if (!Number.isFinite(v) || v <= 0) {
+        showToast(`${field} must be a positive number`);
+        return undefined;
+      }
+      return v;
+    };
+    const target = parseOptionalPrice(targetPrice, 'Target price');
+    if (target === undefined) return;
+    const stop = parseOptionalPrice(stopLoss, 'Stop loss');
+    if (stop === undefined) return;
 
     setIsSaving(true);
     try {
@@ -91,8 +107,8 @@ export const NoteModal: React.FC = () => {
           title: title.trim(),
           content: content.trim(),
           tags: tags.trim(),
-          target_price: targetPrice.trim() ? parseFloat(targetPrice) : null,
-          stop_loss: stopLoss.trim() ? parseFloat(stopLoss) : null,
+          target_price: target,
+          stop_loss: stop,
           reference_note_ids: referenceIds,
         });
         showToast(`Note #${editingNote.id} updated`);
@@ -106,8 +122,8 @@ export const NoteModal: React.FC = () => {
           title: title.trim(),
           content: content.trim(),
           tags: tags.trim(),
-          target_price: targetPrice.trim() ? parseFloat(targetPrice) : null,
-          stop_loss: stopLoss.trim() ? parseFloat(stopLoss) : null,
+          target_price: target,
+          stop_loss: stop,
           reference_note_ids: referenceIds,
         });
         showToast(`New note logged for ${currentSym}`);

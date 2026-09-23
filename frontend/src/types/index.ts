@@ -12,14 +12,18 @@ export interface Stock {
   name: string;
 }
 
+/// Mirrors the Rust backend `StockMover` (src/domain/mover.rs).
 export interface StockMover {
   symbol: string;
-  name?: string;
+  name: string;
   price: number;
+  prev_close: number;
+  change: number;
   change_percent: number;
-  previous_close?: number;
-  sparkline: number[];
-  is_positive: boolean;
+  volume: number;
+  day_high: number;
+  day_low: number;
+  timestamp: number;
 }
 
 export interface Candle {
@@ -80,6 +84,7 @@ export interface MarketStatus {
   is_trading_day: boolean;
 }
 
+/// Mirrors the Rust backend `CacheSyncMeta` (src/storage/mod.rs).
 export interface CacheSyncMeta {
   symbol: string;
   timeframe: string;
@@ -87,15 +92,23 @@ export interface CacheSyncMeta {
   last_candle_ts: number;
   candle_count: number;
   last_synced_at: number;
-  has_gap: boolean;
+  last_verified_at: number;
+  is_gap_detected: boolean;
 }
 
+/// Mirrors the Rust backend `ScanResult` (src/domain/mover.rs).
 export interface ScanResult {
+  timestamp: number;
   scan_time: string;
-  threshold_used: number;
-  stocks_scanned: number;
-  gainers: StockMover[];
-  losers: StockMover[];
+  threshold_percent: number;
+  total_scanned: number;
+  movers_count: number;
+  gainers_count: number;
+  losers_count: number;
+  movers: StockMover[];
+  all_quotes: StockMover[];
+  /** Added by newer backends; absent in older cached payloads. */
+  failed_count?: number;
 }
 
 export interface ScanState {

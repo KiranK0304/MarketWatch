@@ -115,7 +115,7 @@ export const Sidebar: React.FC = () => {
                     style={{ fontSize: '10px', padding: '0 6px' }}
                     onClick={() => {
                       setMoversThreshold(th);
-                      triggerScan(false);
+                      triggerScan(false, th);
                     }}
                   >
                     ±{th}%

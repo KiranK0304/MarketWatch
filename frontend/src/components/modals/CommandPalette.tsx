@@ -68,9 +68,11 @@ export const CommandPalette: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (commands.length === 0) return;
       setSelectedIndex(prev => (prev + 1) % commands.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (commands.length === 0) return;
       setSelectedIndex(prev => (prev - 1 + commands.length) % commands.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();

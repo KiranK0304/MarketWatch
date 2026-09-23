@@ -32,9 +32,20 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
 
   const timeframes: Timeframe[] = ['5m', '15m', '30m', '1h', '1d', '1w'];
 
-  // Grid pagination calculations
-  const totalGridItems =
-    gridScope === 'universe' ? stocks.length : filteredMovers.length;
+  // Grid pagination calculations (post-search, mirroring MultiChartGrid's
+  // filter — counting pre-search totals showed e.g. "1 / 7" over an empty grid).
+  const gridItems =
+    gridScope === 'universe'
+      ? stocks
+      : filteredMovers.map(m => ({ symbol: m.symbol, name: m.name }));
+  const gridQuery = gridSearch.trim().toLowerCase();
+  const totalGridItems = gridQuery
+    ? gridItems.filter(
+        s =>
+          s.symbol.toLowerCase().includes(gridQuery) ||
+          s.name.toLowerCase().includes(gridQuery)
+      ).length
+    : gridItems.length;
   const totalPages = Math.max(1, Math.ceil(totalGridItems / gridPageSize));
 
   return (

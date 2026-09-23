@@ -24,7 +24,7 @@ interface AppContextValue {
   selectStock: (symbolOrIndex: string | number) => void;
   nextStock: () => void;
   prevStock: () => void;
-  reloadStocks: () => Promise<void>;
+  reloadStocks: () => Promise<Stock[] | null>;
   addStock: (symbol: string, name: string) => Promise<void>;
   deleteStock: (symbol: string) => Promise<void>;
 
@@ -41,7 +41,7 @@ interface AppContextValue {
   moversFilter: 'all' | 'gainers' | 'losers';
   setMoversFilter: (filter: 'all' | 'gainers' | 'losers') => void;
   filteredMovers: StockMover[];
-  triggerScan: (force?: boolean) => Promise<void>;
+  triggerScan: (force?: boolean, thresholdOverride?: number) => Promise<void>;
 
   // Sidebar
   sidebarTab: SidebarTab;
@@ -180,13 +180,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, 2500);
   }, []);
 
-  // Load stocks
+  // Load stocks (returns the fresh list so callers can act on it without
+  // reading the still-stale `stocks` closure).
   const reloadStocks = useCallback(async () => {
     try {
       const data = await api.getStocks();
       setStocks(data);
+      return data;
     } catch (err: any) {
       showToast(`Failed to load stocks: ${err.message}`);
+      return null;
     }
   }, [showToast]);
 
@@ -258,8 +261,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const added = await api.addStock(symbol, name);
         showToast(`Added ${added.symbol}`);
-        await reloadStocks();
-        selectStock(added.symbol);
+        const fresh = await reloadStocks();
+        // Select by index in the reloaded list: `selectStock` closes over the
+        // pre-reload `stocks` array and can miss the new entry.
+        if (fresh) {
+          const idx = fresh.findIndex(
+            s => s.symbol.toUpperCase() === added.symbol.toUpperCase()
+          );
+          if (idx !== -1) selectStock(idx);
+        }
       } catch (err: any) {
         showToast(`Error: ${err.message}`);
         throw err;
@@ -274,14 +284,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         await api.deleteStock(symbol);
         showToast(`Removed ${symbol}`);
-        const nextList = stocks.filter(s => s.symbol !== symbol);
+        // Case-insensitive: the backend deletes case-insensitively, so an
+        // exact-case filter would leave the row in local state.
+        const upper = symbol.toUpperCase();
+        const nextList = stocks.filter(s => s.symbol.toUpperCase() !== upper);
         setStocks(nextList);
         setMovers(prev => {
           if (!prev) return prev;
+          const drop = (m: StockMover) => m.symbol.toUpperCase() !== upper;
           return {
             ...prev,
-            gainers: prev.gainers.filter(m => m.symbol !== symbol),
-            losers: prev.losers.filter(m => m.symbol !== symbol),
+            movers: prev.movers.filter(drop),
+            all_quotes: prev.all_quotes.filter(drop),
           };
         });
         setCurrentIndex(prev => Math.min(prev, Math.max(0, nextList.length - 1)));
@@ -292,21 +306,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [stocks, showToast]
   );
 
-  // Filtered movers
+  // Filtered movers, derived from the backend `movers` list. Older cached
+  // payloads (pre-contract-fix) lack `movers`, so fall back to empty.
   const filteredMovers = useMemo(() => {
-    if (!movers) return [];
-    if (moversFilter === 'gainers') return movers.gainers;
-    if (moversFilter === 'losers') return movers.losers;
-    return [...movers.gainers, ...movers.losers];
+    const list = Array.isArray(movers?.movers) ? movers!.movers : [];
+    if (moversFilter === 'gainers') return list.filter(m => m.change_percent >= 0);
+    if (moversFilter === 'losers') return list.filter(m => m.change_percent < 0);
+    return list;
   }, [movers, moversFilter]);
 
   const triggerScan = useCallback(
-    async (force: boolean = false) => {
+    async (force: boolean = false, thresholdOverride?: number) => {
+      // Use the explicit threshold when provided: `setMoversThreshold` is
+      // async, so reading state right after setting it scans stale.
+      const threshold = thresholdOverride ?? moversThreshold;
+      if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 100) {
+        showToast(`Invalid threshold ${threshold}: must be in (0, 100]`);
+        return;
+      }
       try {
         showToast('Scanning market movers...');
-        const res = await api.scanMovers(moversThreshold, force);
+        const res = await api.scanMovers(threshold, force);
         setMovers(res);
-        showToast(`Scanned ${res.stocks_scanned} stocks`);
+        const failed =
+          res.failed_count && res.failed_count > 0 ? `, ${res.failed_count} failed` : '';
+        showToast(`Scanned ${res.total_scanned} stocks (${res.movers_count} movers${failed})`);
       } catch (err: any) {
         showToast(`Scan failed: ${err.message}`);
       }
