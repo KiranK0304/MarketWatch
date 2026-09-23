@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{self, StockEntry};
 use crate::domain::{ScanResult, StockMover, Timeframe};
-use crate::provider::MarketDataProvider;
+use crate::provider::CandleSyncService;
 use crate::provider::yahoo::YahooProvider;
 use crate::scanner::{ScanState, Scanner};
 use crate::storage::{CacheSyncMeta, MarketDb};
@@ -32,6 +32,7 @@ pub struct WebState {
     pub config_path: PathBuf,
     pub provider: Arc<YahooProvider>,
     pub db: MarketDb,
+    pub sync_service: CandleSyncService,
 }
 
 #[derive(Debug, Deserialize)]
@@ -222,141 +223,41 @@ async fn get_candles(
         .map_err(|e: String| (StatusCode::BAD_REQUEST, Json(ErrorResponse { error: e })))?;
 
     let force = params.force.unwrap_or(false);
-    let tf_label = timeframe.label();
 
-    // 1. Check if SQLite cache is already fresh (60s TTL during market hours, or market closed)
-    if !force {
-        let fresh = state
-            .db
-            .is_fresh(&params.symbol, tf_label, 60)
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorResponse {
-                        error: e.to_string(),
-                    }),
-                )
-            })?;
-        if fresh {
-            let cached = state
-                .db
-                .get_candles(&params.symbol, tf_label)
-                .map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            error: e.to_string(),
-                        }),
-                    )
-                })?;
-            if !cached.is_empty() {
-                println!(
-                    "[CACHE HIT] {} ({}) -> served {} candles from SQLite (0 API calls)",
-                    params.symbol,
-                    tf_label,
-                    cached.len()
-                );
-                return Ok((
-                    [(header::HeaderName::from_static("x-cache"), "HIT")],
-                    Json(cached),
-                )
-                    .into_response());
-            }
-        }
-    }
-
-    if force {
-        println!(
-            "[FORCE REFRESH] {} ({}) -> bypassing cache, fetching from Yahoo Finance API...",
-            params.symbol, tf_label
-        );
-    } else {
-        println!(
-            "[CACHE MISS] {} ({}) -> cache stale or empty, fetching from Yahoo Finance API...",
-            params.symbol, tf_label
-        );
-    }
-
-    // 2. Otherwise fetch from Yahoo Provider
     match state
-        .provider
-        .fetch_candles(&params.symbol, timeframe)
+        .sync_service
+        .get_candles(&params.symbol, timeframe, force)
         .await
     {
-        Ok(candles) => {
-            let now = chrono::Utc::now().timestamp();
-            // Cache in SQLite with upsert
-            state
-                .db
-                .save_candles(&params.symbol, tf_label, &candles, now)
-                .map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            error: e.to_string(),
-                        }),
-                    )
-                })?;
+        Ok((candles, status)) => {
             println!(
-                "[SYNC SAVED] {} ({}) -> upserted {} candles into SQLite",
+                "[{}] {} ({}) -> served {} candles",
+                status.header_value(),
                 params.symbol,
-                tf_label,
+                timeframe.label(),
                 candles.len()
             );
-
-            // Return full accumulated historical candles from DB
-            let all_candles = state
-                .db
-                .get_candles(&params.symbol, tf_label)
-                .map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            error: e.to_string(),
-                        }),
-                    )
-                })?;
-            let result_candles = if all_candles.is_empty() {
-                candles
-            } else {
-                all_candles
-            };
-
             Ok((
-                [(header::HeaderName::from_static("x-cache"), "MISS")],
-                Json(result_candles),
+                [(
+                    header::HeaderName::from_static("x-cache"),
+                    status.header_value(),
+                )],
+                Json(candles),
             )
                 .into_response())
         }
         Err(e) => {
-            // Graceful fallback: If network request failed or rate-limited,
-            // return any cached candles we already have in SQLite
-            let cached = state
-                .db
-                .get_candles(&params.symbol, tf_label)
-                .map_err(|db_error| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            error: db_error.to_string(),
-                        }),
-                    )
-                })?;
-            if !cached.is_empty() {
-                println!(
-                    "[FALLBACK CACHE] {} ({}) -> network failed, served {} candles from SQLite",
-                    params.symbol,
-                    tf_label,
-                    cached.len()
-                );
-                return Ok((
-                    [(header::HeaderName::from_static("x-cache"), "FALLBACK")],
-                    Json(cached),
-                )
-                    .into_response());
-            }
+            let status = match e {
+                crate::error::MarketError::Provider { status: 404, .. }
+                | crate::error::MarketError::NoData { .. } => StatusCode::NOT_FOUND,
+                crate::error::MarketError::Provider { .. }
+                | crate::error::MarketError::Network(_) => StatusCode::BAD_GATEWAY,
+                crate::error::MarketError::InvalidSymbol(_)
+                | crate::error::MarketError::InvalidTimeframe(_) => StatusCode::BAD_REQUEST,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
             Err((
-                StatusCode::BAD_GATEWAY,
+                status,
                 Json(ErrorResponse {
                     error: e.to_string(),
                 }),
@@ -523,10 +424,12 @@ pub async fn start_server(
     if let Ok(cfg) = config::load_stock_config(&config_path) {
         let _ = db.sync_tickers(&cfg.stocks);
     }
+    let sync_service = CandleSyncService::new(db.clone(), provider.clone());
     let state = WebState {
         config_path,
         provider,
         db,
+        sync_service,
     };
 
     let app = create_router(state);
