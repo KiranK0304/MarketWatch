@@ -78,14 +78,14 @@ export const api = {
     const res = await fetch(
       `/api/cache/meta?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`
     );
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
     return handleResponse<CacheSyncMeta>(res);
   },
 
   // Movers & Scanner
   async getCachedMovers(): Promise<ScanResult | null> {
     const res = await fetch('/api/scan/cached');
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
     return handleResponse<ScanResult>(res);
   },
 
@@ -97,7 +97,7 @@ export const api = {
 
   async getScanState(): Promise<ScanState | null> {
     const res = await fetch('/api/scan/state');
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
     return handleResponse<ScanState>(res);
   },
 
