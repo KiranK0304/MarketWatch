@@ -80,39 +80,51 @@ impl YahooProvider {
             symbol: symbol.to_string(),
         }))
     }
-}
-
-impl MarketDataProvider for YahooProvider {
-    async fn fetch_candles(
+    /// Fetch OHLCV candle data for a symbol and timeframe within an explicit timestamp range.
+    ///
+    /// Automatically clamps queries to Yahoo Finance's interval limits (e.g. 59 days for 5m/15m).
+    pub async fn fetch_candles_range(
         &self,
         symbol: &str,
         timeframe: Timeframe,
+        period1: i64,
+        period2: i64,
     ) -> Result<Vec<Candle>, MarketError> {
-        // query2 is significantly more reliable and less prone to aggressive 429 rate limiting
+        let now_epoch = chrono::Utc::now().timestamp();
+        let clamped_period1 = match timeframe {
+            Timeframe::Min5 | Timeframe::Min15 => period1.max(now_epoch - 59 * 86400),
+            Timeframe::Min30 | Timeframe::Hour1 => period1.max(now_epoch - 720 * 86400),
+            Timeframe::Day1 | Timeframe::Week1 => period1,
+        };
+        let clamped_period2 = period2.max(clamped_period1 + 60);
+
+        let p1_str = clamped_period1.to_string();
+        let p2_str = clamped_period2.to_string();
+        let params = [
+            ("interval", timeframe.yahoo_interval()),
+            ("period1", p1_str.as_str()),
+            ("period2", p2_str.as_str()),
+        ];
+
+        self.execute_chart_request(symbol, timeframe, &params).await
+    }
+
+    /// Internal HTTP execution loop with query2/query1 endpoint fallback.
+    async fn execute_chart_request(
+        &self,
+        symbol: &str,
+        timeframe: Timeframe,
+        query_params: &[(&str, &str)],
+    ) -> Result<Vec<Candle>, MarketError> {
         let endpoints = [
-            format!(
-                "https://query2.finance.yahoo.com/v8/finance/chart/{}",
-                symbol
-            ),
-            format!(
-                "https://query1.finance.yahoo.com/v8/finance/chart/{}",
-                symbol
-            ),
+            format!("https://query2.finance.yahoo.com/v8/finance/chart/{symbol}"),
+            format!("https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"),
         ];
 
         let mut last_error = None;
 
         for url in endpoints {
-            let response = match self
-                .client
-                .get(&url)
-                .query(&[
-                    ("interval", timeframe.yahoo_interval()),
-                    ("range", timeframe.yahoo_range()),
-                ])
-                .send()
-                .await
-            {
+            let response = match self.client.get(&url).query(query_params).send().await {
                 Ok(resp) => resp,
                 Err(e) => {
                     last_error = Some(MarketError::Network(e));
@@ -142,12 +154,26 @@ impl MarketDataProvider for YahooProvider {
             let yahoo_response: YahooChartResponse = serde_json::from_str(&body)
                 .map_err(|e| MarketError::Parse(format!("Yahoo JSON parse error: {e}")))?;
 
-            return convert_to_candles(&yahoo_response, symbol);
+            return convert_to_candles_aligned(&yahoo_response, symbol, Some(timeframe));
         }
 
         Err(last_error.unwrap_or_else(|| MarketError::NoData {
             symbol: symbol.to_string(),
         }))
+    }
+}
+
+impl MarketDataProvider for YahooProvider {
+    async fn fetch_candles(
+        &self,
+        symbol: &str,
+        timeframe: Timeframe,
+    ) -> Result<Vec<Candle>, MarketError> {
+        let params = [
+            ("interval", timeframe.yahoo_interval()),
+            ("range", timeframe.yahoo_range()),
+        ];
+        self.execute_chart_request(symbol, timeframe, &params).await
     }
 }
 
@@ -211,11 +237,20 @@ struct YahooQuote {
 // Conversion: Yahoo response → Vec<Candle>
 // ---------------------------------------------------------------------------
 
-/// Convert a Yahoo chart response into normalized candles.
-/// Skips entries where any OHLCV field is null.
+/// Convert a Yahoo chart response into normalized candles (without alignment, for test backward compatibility).
+#[cfg(test)]
 fn convert_to_candles(
     response: &YahooChartResponse,
     symbol: &str,
+) -> Result<Vec<Candle>, MarketError> {
+    convert_to_candles_aligned(response, symbol, None)
+}
+
+/// Convert a Yahoo chart response into normalized candles, optionally aligning timestamps to timeframe boundaries.
+fn convert_to_candles_aligned(
+    response: &YahooChartResponse,
+    symbol: &str,
+    timeframe: Option<Timeframe>,
 ) -> Result<Vec<Candle>, MarketError> {
     // Check for API-level errors
     if let Some(ref err) = response.chart.error {
@@ -278,7 +313,12 @@ fn convert_to_candles(
         .zip(&quote.volume)
         .filter_map(|(((((ts, o), h), l), c), v)| Some((*ts, (*o)?, (*h)?, (*l)?, (*c)?, (*v)?)));
 
-    for (ts, open, high, low, close, volume) in iter {
+    for (raw_ts, open, high, low, close, volume) in iter {
+        let ts = if let Some(tf) = timeframe {
+            crate::domain::calendar::MarketCalendar::align_timestamp(raw_ts, tf)
+        } else {
+            raw_ts
+        };
         let datetime = DateTime::from_timestamp(ts, 0).unwrap_or_default();
 
         candles.push(Candle {
@@ -298,7 +338,21 @@ fn convert_to_candles(
         });
     }
 
-    Ok(candles)
+    // Sort by timestamp and deduplicate multiple ticks that floored to the exact same boundary slot
+    candles.sort_by_key(|c| c.timestamp);
+    let mut deduped: Vec<Candle> = Vec::with_capacity(candles.len());
+    for c in candles {
+        if let Some(last) = deduped.last_mut().filter(|l| l.timestamp == c.timestamp) {
+            last.high = last.high.max(c.high);
+            last.low = last.low.min(c.low);
+            last.close = c.close;
+            last.volume = c.volume;
+            continue;
+        }
+        deduped.push(c);
+    }
+
+    Ok(deduped)
 }
 
 /// Convert a Yahoo chart response into a normalized `StockMover`.
