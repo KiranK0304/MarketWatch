@@ -72,6 +72,10 @@ export const NoteModal: React.FC = () => {
       showToast('Title and content are required');
       return;
     }
+    if (!editingNote && (!activeStock || latestPrice <= 0 || latestCandleTimestamp === null)) {
+      showToast('Wait for the active stock chart to finish loading');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -91,8 +95,8 @@ export const NoteModal: React.FC = () => {
         await api.createNote({
           symbol: currentSym,
           timeframe: currentTf,
-          candle_timestamp: latestCandleTimestamp || Math.floor(Date.now() / 1000),
-          price_at_note: latestPrice > 0 ? latestPrice : 1.0,
+          candle_timestamp: latestCandleTimestamp,
+          price_at_note: latestPrice,
           title: title.trim(),
           content: content.trim(),
           tags: tags.trim(),
