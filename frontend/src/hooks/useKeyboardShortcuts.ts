@@ -21,6 +21,9 @@ export function useKeyboardShortcuts() {
     toggleDrawer,
     viewMode,
     setViewMode,
+    toggleTheme,
+    zoomIn,
+    zoomOut,
   } = useApp();
 
   useEffect(() => {
@@ -102,6 +105,20 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           setViewMode(viewMode === 'single' ? 'grid' : 'single');
           break;
+        case 't':
+          e.preventDefault();
+          toggleTheme();
+          break;
+        case '+':
+        case '=':
+          e.preventDefault();
+          zoomIn();
+          break;
+        case '-':
+        case '_':
+          e.preventDefault();
+          zoomOut();
+          break;
         case '?':
           e.preventDefault();
           openShortcuts();
@@ -135,5 +152,8 @@ export function useKeyboardShortcuts() {
     toggleDrawer,
     viewMode,
     setViewMode,
+    toggleTheme,
+    zoomIn,
+    zoomOut,
   ]);
 }

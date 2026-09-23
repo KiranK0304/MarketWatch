@@ -28,6 +28,10 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
     openNoteModal,
     openShortcuts,
     triggerForceRefresh,
+    zoom,
+    setZoom,
+    zoomIn,
+    zoomOut,
   } = useApp();
 
   const timeframes: Timeframe[] = ['5m', '15m', '30m', '1h', '1d', '1w'];
@@ -114,6 +118,38 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
             <span>Grid</span>
           </button>
         </div>
+
+        {/* Zoom Dial / Bar Spacing */}
+        {viewMode === 'single' && (
+          <div className="zoom-dial-wrapper" title="Candlestick zoom / bar spacing (+ / -)">
+            <button
+              type="button"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', padding: '0 2px' }}
+              title="Zoom Out (-)"
+              onClick={zoomOut}
+            >
+              ➖
+            </button>
+            <input
+              type="range"
+              id="zoom-range"
+              min="1"
+              max="10"
+              step="0.5"
+              value={zoom}
+              onChange={e => setZoom(parseFloat(e.target.value))}
+            />
+            <span id="zoom-val" style={{ minWidth: '24px', textAlign: 'center' }}>{zoom}px</span>
+            <button
+              type="button"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', padding: '0 2px' }}
+              title="Zoom In (+)"
+              onClick={zoomIn}
+            >
+              ➕
+            </button>
+          </div>
+        )}
 
         {/* Grid-Specific Controls (Scope, Search, Pagination) */}
         {viewMode === 'grid' && (

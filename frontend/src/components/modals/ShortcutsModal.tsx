@@ -14,6 +14,8 @@ export const ShortcutsModal: React.FC = () => {
     { key: 'I', desc: 'Toggle Intel & AI Side Drawer' },
     { key: 'G', desc: 'Toggle Single Focus Chart / Multi-Chart Grid' },
     { key: '/', desc: 'Focus Watchlist Search Filter' },
+    { key: 'T', desc: 'Toggle White / Black Theme' },
+    { key: '+ / -', desc: 'Zoom In / Out Candlestick Spacing' },
     { key: 'Ctrl + K', desc: 'Open Command Palette' },
     { key: '?', desc: 'Open this Keyboard Shortcuts Guide' },
     { key: 'Esc', desc: 'Close any open modal dialog' },

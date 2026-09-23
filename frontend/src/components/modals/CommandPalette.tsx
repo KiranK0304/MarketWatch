@@ -14,6 +14,9 @@ export const CommandPalette: React.FC = () => {
     openShortcuts,
     stocks,
     selectStock,
+    toggleTheme,
+    zoomIn,
+    zoomOut,
   } = useApp();
 
   const [query, setQuery] = useState('');
@@ -36,6 +39,9 @@ export const CommandPalette: React.FC = () => {
       { id: 'tf-15m', label: 'Timeframe: 15 Minutes (2)', group: 'Timeframe', action: () => setTimeframe('15m') },
       { id: 'tf-1h', label: 'Timeframe: 1 Hour (4)', group: 'Timeframe', action: () => setTimeframe('1h') },
       { id: 'tf-1d', label: 'Timeframe: 1 Day (5)', group: 'Timeframe', action: () => setTimeframe('1d') },
+      { id: 'theme', label: 'Toggle White / Black Theme (T)', group: 'Appearance', action: () => toggleTheme() },
+      { id: 'zoom-in', label: 'Zoom In Candlesticks (+)', group: 'Chart', action: () => zoomIn() },
+      { id: 'zoom-out', label: 'Zoom Out Candlesticks (-)', group: 'Chart', action: () => zoomOut() },
       { id: 'scan', label: 'Run Market Movers Scanner', group: 'Actions', action: () => triggerScan(true) },
       { id: 'sync', label: 'Force Sync Yahoo Finance Cache (F)', group: 'Actions', action: () => triggerForceRefresh() },
       { id: 'drawer', label: 'Toggle Intel & AI Panel (I)', group: 'Navigation', action: () => toggleDrawer() },

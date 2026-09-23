@@ -108,17 +108,21 @@ export const Sidebar: React.FC = () => {
           <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div className="timeframe-group" style={{ height: '24px' }}>
-                {[3.0, 5.0, 7.0].map(th => (
+                {[
+                  { value: 1.0, label: '1%' },
+                  { value: 2.0, label: '2%' },
+                  { value: 3.0, label: '3%+' },
+                ].map(item => (
                   <button
-                    key={th}
-                    className={`tf-btn ${moversThreshold === th ? 'active' : ''}`}
-                    style={{ fontSize: '10px', padding: '0 6px' }}
+                    key={item.value}
+                    className={`tf-btn ${moversThreshold === item.value ? 'active' : ''}`}
+                    style={{ fontSize: '10px', padding: '0 8px' }}
                     onClick={() => {
-                      setMoversThreshold(th);
-                      triggerScan(false, th);
+                      setMoversThreshold(item.value);
+                      triggerScan(false, item.value);
                     }}
                   >
-                    ±{th}%
+                    {item.label}
                   </button>
                 ))}
               </div>

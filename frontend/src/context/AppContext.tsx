@@ -106,6 +106,14 @@ interface AppContextValue {
   forceRefreshCounter: number;
   triggerForceRefresh: () => void;
 
+  // Theme & Zoom
+  isDark: boolean;
+  toggleTheme: () => void;
+  zoom: number;
+  setZoom: (z: number | ((prev: number) => number)) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+
   // Toast
   toast: string | null;
   showToast: (msg: string) => void;
@@ -168,6 +176,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+
+  // Theme state (persisted in localStorage, default dark)
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mw_theme');
+    return saved ? saved === 'dark' : true;
+  });
+
+  useEffect(() => {
+    document.body.classList.toggle('dark-theme', isDark);
+    localStorage.setItem('mw_theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
+
+  const toggleTheme = useCallback(() => {
+    setIsDark(prev => !prev);
+  }, []);
+
+  // Zoom state (candle barSpacing, persisted in localStorage, default 2.5)
+  const [zoom, setZoom] = useState<number>(() => {
+    const saved = localStorage.getItem('mw-zoom');
+    const parsed = saved ? parseFloat(saved) : 2.5;
+    return Number.isFinite(parsed) && parsed >= 0.5 && parsed <= 10 ? parsed : 2.5;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mw-zoom', String(zoom));
+  }, [zoom]);
+
+  const zoomIn = useCallback(() => {
+    setZoom(prev => Math.min(10, Math.round((prev + 0.5) * 10) / 10));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoom(prev => Math.max(0.5, Math.round((prev - 0.5) * 10) / 10));
+  }, []);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -306,14 +348,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [stocks, showToast]
   );
 
-  // Filtered movers, derived from the backend `movers` list. Older cached
-  // payloads (pre-contract-fix) lack `movers`, so fall back to empty.
+  // Filtered movers, prioritizing all_quotes for instant client-side threshold filtering
   const filteredMovers = useMemo(() => {
-    const list = Array.isArray(movers?.movers) ? movers!.movers : [];
+    let list: StockMover[] = [];
+    if (Array.isArray(movers?.all_quotes) && movers!.all_quotes.length > 0) {
+      list = movers!.all_quotes.filter(m => Math.abs(m.change_percent) >= moversThreshold);
+    } else if (Array.isArray(movers?.movers)) {
+      list = movers!.movers.filter(m => Math.abs(m.change_percent) >= moversThreshold);
+    }
+    list = [...list].sort((a, b) => Math.abs(b.change_percent) - Math.abs(a.change_percent));
     if (moversFilter === 'gainers') return list.filter(m => m.change_percent >= 0);
     if (moversFilter === 'losers') return list.filter(m => m.change_percent < 0);
     return list;
-  }, [movers, moversFilter]);
+  }, [movers, moversFilter, moversThreshold]);
 
   const triggerScan = useCallback(
     async (force: boolean = false, thresholdOverride?: number) => {
@@ -453,6 +500,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     forceRefreshCounter,
     triggerForceRefresh,
+
+    // Theme & Zoom
+    isDark,
+    toggleTheme,
+    zoom,
+    setZoom,
+    zoomIn,
+    zoomOut,
 
     toast,
     showToast,

@@ -20,6 +20,8 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     setDrawerTab,
     setLatestCandleInfo,
     setCandles,
+    isDark,
+    zoom,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,18 +50,23 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const bgColor = isDark ? '#111726' : '#ffffff';
+    const gridColor = isDark ? '#1a233a' : '#f1f5f9';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const borderColor = isDark ? '#232e47' : '#e2e8f0';
+
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
       layout: {
-        background: { color: '#111726' },
-        textColor: '#94a3b8',
+        background: { color: bgColor },
+        textColor: textColor,
         fontSize: 11,
         fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {
-        vertLines: { color: '#1a233a', style: 1 },
-        horzLines: { color: '#1a233a', style: 1 },
+        vertLines: { color: gridColor, style: 1 },
+        horzLines: { color: gridColor, style: 1 },
       },
       crosshair: {
         mode: 1,
@@ -67,12 +74,12 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
         horzLine: { color: '#3b82f6', width: 1, style: 3 },
       },
       timeScale: {
-        borderColor: '#232e47',
+        borderColor: borderColor,
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: '#232e47',
+        borderColor: borderColor,
         scaleMargins: { top: 0.1, bottom: 0.2 },
       },
     });
@@ -205,6 +212,11 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
           }
 
           chartRef.current?.timeScale().fitContent();
+          chartRef.current?.timeScale().applyOptions({
+            barSpacing: zoom,
+            rightOffset: Math.max(3, Math.round(zoom + 2)),
+            minBarSpacing: 0.5,
+          });
         }
       } catch (err) {
         console.warn('Failed to load candles', err);
@@ -322,6 +334,45 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     }, 220);
     return () => clearTimeout(timer);
   }, [isDrawerOpen, updateDotsPosition]);
+
+  // Apply theme changes to chart canvas
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const bgColor = isDark ? '#111726' : '#ffffff';
+    const gridColor = isDark ? '#1a233a' : '#f1f5f9';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const borderColor = isDark ? '#232e47' : '#e2e8f0';
+
+    chart.applyOptions({
+      layout: {
+        background: { color: bgColor },
+        textColor: textColor,
+      },
+      grid: {
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor },
+      },
+      timeScale: {
+        borderColor: borderColor,
+      },
+      rightPriceScale: {
+        borderColor: borderColor,
+      },
+    });
+  }, [isDark]);
+
+  // Apply zoom changes to chart canvas
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.timeScale().applyOptions({
+      barSpacing: zoom,
+      rightOffset: Math.max(3, Math.round(zoom + 2)),
+      minBarSpacing: 0.5,
+    });
+    updateDotsPosition();
+  }, [zoom, updateDotsPosition]);
 
   // Handle dot click: open journal drawer & scroll to note
   const handleDotClick = (noteId: number) => {
