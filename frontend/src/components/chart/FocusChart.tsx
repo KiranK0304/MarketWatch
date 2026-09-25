@@ -46,6 +46,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     activeStock,
     timeframe,
     forceRefreshCounter,
+    triggerForceRefresh,
     setCacheLatency,
     setChartCacheHeader,
     isDrawerOpen,
@@ -55,6 +56,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     setCandles,
     isDark,
     zoom,
+    showToast,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -270,13 +272,17 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
           setChartError(`No trading candle data available for ${activeStock?.symbol} on ${timeframe}.`);
         }
       } catch (err: any) {
-        console.warn('Failed to load candles', err);
+        console.error('Failed to load candles:', err);
         if (isSubscribed) {
-          setChartError(err?.message || 'Unable to load candles for this symbol.');
+          const errorMsg = err?.message || 'Unable to load candles for this symbol.';
+          setChartError(errorMsg);
           setCandleData([]);
           setCandles([]);
           candleSeriesRef.current?.setData([]);
           volumeSeriesRef.current?.setData([]);
+          setCacheLatency('ERR');
+          setChartCacheHeader('ERROR');
+          showToast(`Error loading ${activeStock?.symbol}: ${errorMsg}`);
         }
       }
     }
@@ -483,7 +489,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
       <div ref={containerRef} id="chart-canvas" style={{ width: '100%', height: '100%' }} />
 
       {/* Chart Error Overlay */}
-      {chartError && candleData.length === 0 && (
+      {chartError && (
         <div
           style={{
             position: 'absolute',
@@ -506,6 +512,13 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
           <div style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '440px', lineHeight: '1.5' }}>
             {chartError}
           </div>
+          <button
+            onClick={() => triggerForceRefresh()}
+            className="note-btn note-btn-save"
+            style={{ marginTop: '8px', cursor: 'pointer' }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
