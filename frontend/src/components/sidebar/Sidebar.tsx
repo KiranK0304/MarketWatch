@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC = React.memo(() => {
   const {
     stocks,
     currentIndex,
@@ -299,4 +299,4 @@ export const Sidebar: React.FC = () => {
       )}
     </aside>
   );
-};
+});

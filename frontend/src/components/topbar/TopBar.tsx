@@ -7,7 +7,7 @@ interface TopBarProps {
   heroChange: { text: string; isPositive: boolean };
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
+export const TopBar: React.FC<TopBarProps> = React.memo(({ heroPrice, heroChange }) => {
   const {
     activeStock,
     timeframe,
@@ -229,4 +229,4 @@ export const TopBar: React.FC<TopBarProps> = ({ heroPrice, heroChange }) => {
       </div>
     </header>
   );
-};
+});
