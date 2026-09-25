@@ -55,7 +55,6 @@ export function calculateInsights(candles: Candle[] | undefined | null): Technic
 
     // Candlestick pattern detection
     const lastBody = Math.abs(last.close - last.open);
-    const prevBody = Math.abs(prev.close - prev.open);
 
     if (
       last.close > last.open &&

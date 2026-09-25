@@ -4,7 +4,6 @@ import { useApp } from '../../context/AppContext';
 export const Sidebar: React.FC = React.memo(() => {
   const {
     stocks,
-    currentIndex,
     activeStock,
     selectStock,
     addStock,
@@ -13,7 +12,6 @@ export const Sidebar: React.FC = React.memo(() => {
     setSidebarTab,
     sidebarSearch,
     setSidebarSearch,
-    movers,
     moversThreshold,
     setMoversThreshold,
     moversFilter,
