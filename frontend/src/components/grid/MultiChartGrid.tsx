@@ -11,19 +11,41 @@ interface GridCardProps {
 }
 
 const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const [priceInfo, setPriceInfo] = useState<{ price: string; chg: string; isPos: boolean }>({
     price: '₹--',
     chg: '--',
     isPos: true,
   });
 
+  // IntersectionObserver to virtualize canvas contexts so only visible cards mount charts
   useEffect(() => {
-    if (!containerRef.current) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          setIsVisible(entry.isIntersecting);
+        }
+      },
+      { rootMargin: '150px' }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible || !containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
+      width: containerRef.current.clientWidth || 240,
       height: 120,
       layout: {
         background: { color: 'transparent' },
@@ -102,10 +124,10 @@ const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
       chart.remove();
       chartRef.current = null;
     };
-  }, [stock.symbol, timeframe]);
+  }, [isVisible, stock.symbol, timeframe]);
 
   return (
-    <div className="grid-chart-card" onClick={() => onSelect(stock.symbol)}>
+    <div ref={cardRef} className="grid-chart-card" onClick={() => onSelect(stock.symbol)}>
       <div className="grid-chart-header">
         <div>
           <div className="grid-chart-sym">{stock.symbol}</div>
@@ -118,7 +140,21 @@ const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
           </div>
         </div>
       </div>
-      <div ref={containerRef} className="grid-chart-canvas" style={{ height: '120px', width: '100%' }} />
+      <div
+        ref={containerRef}
+        className="grid-chart-canvas"
+        style={{
+          height: '120px',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {!isVisible && (
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Loading chart...</div>
+        )}
+      </div>
     </div>
   );
 };
