@@ -174,8 +174,7 @@ impl MarketDb {
                       SELECT symbol, timeframe, timestamp, open, high, low, close, volume FROM candles;
                       DROP TABLE candles;
                       ALTER TABLE candles_new RENAME TO candles;
-                      CREATE INDEX IF NOT EXISTS idx_candles_lookup 
-                      ON candles (symbol, timeframe, timestamp ASC);
+                      DROP INDEX IF EXISTS idx_candles_lookup;
 
                       CREATE TABLE cache_sync_meta_new (
                           symbol          TEXT    NOT NULL,
@@ -217,6 +216,8 @@ impl MarketDb {
                         [],
                     );
                 }
+                // Drop redundant secondary index on WITHOUT ROWID table (the PRIMARY KEY is already the clustered index)
+                let _ = conn.execute("DROP INDEX IF EXISTS idx_candles_lookup;", []);
             }
         } else {
             // Fresh database setup with foreign keys defined upfront
@@ -234,8 +235,7 @@ impl MarketDb {
                     FOREIGN KEY (symbol) REFERENCES tickers(symbol) ON DELETE CASCADE
                 ) WITHOUT ROWID;
 
-                CREATE INDEX IF NOT EXISTS idx_candles_lookup 
-                ON candles (symbol, timeframe, timestamp ASC);
+                DROP INDEX IF EXISTS idx_candles_lookup;
 
                 CREATE TABLE IF NOT EXISTS cache_sync_meta (
                     symbol          TEXT    NOT NULL,
@@ -1542,5 +1542,34 @@ mod tests {
 
         let candles = db.get_candles("INFY.NS", "15m").unwrap();
         assert_eq!(candles.len(), 1);
+    }
+
+    #[test]
+    fn test_redundant_candles_index_not_created() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+
+        // Check sqlite_master: idx_candles_lookup must not exist
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_candles_lookup'")
+            .unwrap();
+        let exists = stmt.exists([]).unwrap();
+        assert!(!exists, "idx_candles_lookup should not exist on WITHOUT ROWID table");
+
+        // Verify EXPLAIN QUERY PLAN uses the primary key
+        let mut qp_stmt = conn
+            .prepare("EXPLAIN QUERY PLAN SELECT open, close FROM candles WHERE symbol = ?1 AND timeframe = ?2 ORDER BY timestamp ASC")
+            .unwrap();
+        let mut rows = qp_stmt.query(params!["TEST.NS", "15m"]).unwrap();
+        let mut plan = String::new();
+        while let Some(row) = rows.next().unwrap() {
+            let detail: String = row.get(3).unwrap();
+            plan.push_str(&detail);
+            plan.push(' ');
+        }
+        assert!(
+            plan.contains("PRIMARY KEY") || plan.contains("candles"),
+            "Query plan should use clustered primary key: {plan}"
+        );
     }
 }
