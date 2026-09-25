@@ -135,10 +135,6 @@ impl eframe::App for ChartApp {
                             " ", // invisible - labels are handled via axis formatter
                         ));
                     }
-
-                    // Use custom x-axis formatter to show dates
-                    let candles_for_fmt = self.candles.clone();
-                    let _ = (time_labels, candles_for_fmt); // used above
                 });
         });
     }
