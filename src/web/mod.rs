@@ -339,7 +339,8 @@ async fn get_candles(
     {
         Ok((candles, status)) => {
             println!(
-                "[{}] {} ({}) -> served {} candles",
+                "{} [API] [{}] {} ({}) -> {} candles",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
                 status.header_value(),
                 params.symbol,
                 timeframe.label(),
