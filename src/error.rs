@@ -55,7 +55,8 @@ impl fmt::Display for MarketError {
                 // Truncate potentially huge HTML bodies so CLI output stays readable.
                 const MAX_BODY: usize = 300;
                 let snippet = if body.len() > MAX_BODY {
-                    format!("{}… ({} bytes total)", &body[..MAX_BODY], body.len())
+                    let boundary = body.floor_char_boundary(MAX_BODY);
+                    format!("{}… ({} bytes total)", &body[..boundary], body.len())
                 } else {
                     body.clone()
                 };
@@ -91,3 +92,41 @@ impl From<rusqlite::Error> for MarketError {
         MarketError::Database(e.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_error_truncation_utf8_boundary() {
+        // Construct a string with 299 'a' characters followed by a 4-byte emoji (🚀 = 4 bytes: 0xF0 0x9F 0x99 0x80)
+        // Total bytes = 303. Index 300 falls inside the 4-byte emoji codepoint.
+        let mut body = "a".repeat(299);
+        body.push('🚀');
+
+        let err = MarketError::Provider {
+            status: 500,
+            symbol: "TEST".to_string(),
+            body,
+        };
+
+        let formatted = format!("{err}");
+        assert!(formatted.contains("Provider error: HTTP 500 for 'TEST':"));
+        assert!(formatted.contains("… (303 bytes total)"));
+        // Boundary should floor before the emoji at byte 299
+        assert!(formatted.contains(&"a".repeat(299)));
+        assert!(!formatted.contains('🚀'));
+    }
+
+    #[test]
+    fn test_provider_error_short_body() {
+        let err = MarketError::Provider {
+            status: 404,
+            symbol: "TEST".to_string(),
+            body: "Not found".to_string(),
+        };
+        let formatted = format!("{err}");
+        assert_eq!(formatted, "Provider error: HTTP 404 for 'TEST': Not found");
+    }
+}
+
