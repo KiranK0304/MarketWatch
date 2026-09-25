@@ -46,6 +46,63 @@ impl YahooProvider {
         Ok(Self { client })
     }
 
+    /// Send an HTTP GET request with retry and exponential backoff for transient errors (429, 5xx, timeouts).
+    async fn send_with_retry(
+        &self,
+        url: &str,
+        query_params: Option<&[(&str, &str)]>,
+    ) -> Result<reqwest::Response, MarketError> {
+        const MAX_RETRIES: u32 = 2;
+        const INITIAL_BACKOFF_MS: u64 = 250;
+
+        let mut attempt = 0;
+        loop {
+            let mut req = self.client.get(url);
+            if let Some(params) = query_params {
+                req = req.query(params);
+            }
+
+            match req.send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if (status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error())
+                        && attempt < MAX_RETRIES
+                    {
+                        let retry_delay = resp
+                            .headers()
+                            .get(reqwest::header::RETRY_AFTER)
+                            .and_then(|h| h.to_str().ok())
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .map(std::time::Duration::from_secs)
+                            .unwrap_or_else(|| {
+                                std::time::Duration::from_millis(
+                                    INITIAL_BACKOFF_MS * 2u64.pow(attempt),
+                                )
+                            });
+
+                        let delay = retry_delay.min(std::time::Duration::from_secs(4));
+                        tokio::time::sleep(delay).await;
+                        attempt += 1;
+                        continue;
+                    }
+
+                    return Ok(resp);
+                }
+                Err(e) => {
+                    if attempt < MAX_RETRIES && (e.is_timeout() || e.is_connect() || e.is_request()) {
+                        let delay = std::time::Duration::from_millis(
+                            INITIAL_BACKOFF_MS * 2u64.pow(attempt),
+                        );
+                        tokio::time::sleep(delay).await;
+                        attempt += 1;
+                        continue;
+                    }
+                    return Err(MarketError::Network(e));
+                }
+            }
+        }
+    }
+
     /// Fetch latest market quote and price change for a stock mover.
     pub async fn fetch_mover(&self, symbol: &str, name: &str) -> Result<StockMover, MarketError> {
         validate_symbol(symbol)?;
@@ -61,10 +118,10 @@ impl YahooProvider {
         let mut last_error = None;
 
         for url in endpoints {
-            let response = match self.client.get(&url).send().await {
+            let response = match self.send_with_retry(&url, None).await {
                 Ok(resp) => resp,
                 Err(e) => {
-                    last_error = Some(MarketError::Network(e));
+                    last_error = Some(e);
                     continue;
                 }
             };
@@ -173,10 +230,10 @@ impl YahooProvider {
         let mut last_error = None;
 
         for url in endpoints {
-            let response = match self.client.get(&url).query(query_params).send().await {
+            let response = match self.send_with_retry(&url, Some(query_params)).await {
                 Ok(resp) => resp,
                 Err(e) => {
-                    last_error = Some(MarketError::Network(e));
+                    last_error = Some(e);
                     continue;
                 }
             };
@@ -723,5 +780,52 @@ mod tests {
             .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_send_with_retry_on_rate_limit() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        use axum::http::StatusCode;
+        use axum::response::IntoResponse;
+        use axum::routing::get;
+
+        let request_count = Arc::new(AtomicUsize::new(0));
+        let count_clone = request_count.clone();
+
+        let app = axum::Router::new().route(
+            "/test-retry",
+            get(move || {
+                let count = count_clone.clone();
+                async move {
+                    let current = count.fetch_add(1, Ordering::SeqCst);
+                    if current == 0 {
+                        // First attempt: simulate Yahoo 429 rate limit with immediate retry header
+                        (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            [(axum::http::header::RETRY_AFTER, "0")],
+                            "Too Many Requests",
+                        )
+                            .into_response()
+                    } else {
+                        // Second attempt: succeeds
+                        (StatusCode::OK, "OK").into_response()
+                    }
+                }
+            }),
+        );
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let provider = YahooProvider::new().unwrap();
+        let url = format!("http://127.0.0.1:{port}/test-retry");
+        let resp = provider.send_with_retry(&url, None).await.unwrap();
+
+        assert_eq!(resp.status(), reqwest::StatusCode::OK);
+        assert_eq!(request_count.load(Ordering::SeqCst), 2);
     }
 }
