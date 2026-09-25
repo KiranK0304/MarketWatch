@@ -49,12 +49,16 @@ export const Sidebar: React.FC = () => {
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSym.trim()) return;
+    const sym = newSym.trim().toUpperCase();
+    const name = newName.trim();
+    if (!sym) return;
     setIsAdding(true);
     try {
-      await addStock(newSym, newName || newSym);
+      await addStock(sym, name || sym);
       setNewSym('');
       setNewName('');
+    } catch (_) {
+      // Error toast already displayed by AppContext
     } finally {
       setIsAdding(false);
     }

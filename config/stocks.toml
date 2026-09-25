@@ -1,5 +1,3 @@
-# Top 150 Indian Equities (Nifty 50 + Nifty Next 50 + Nifty Midcap 50)
-
 [[stocks]]
 symbol = "ADANIENT.NS"
 name = "Adani Enterprises Ltd."
@@ -600,3 +598,6 @@ name = "Waaree Energies Ltd."
 symbol = "YESBANK.NS"
 name = "Yes Bank Ltd."
 
+[[stocks]]
+symbol = "MOTILALOFS.NS"
+name = "Motilal Oswal Financial Services Ltd."

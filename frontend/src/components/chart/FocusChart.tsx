@@ -65,6 +65,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
   const updateDotsPositionRef = useRef<() => void>(() => {});
 
   const [candleData, setCandleData] = useState<Candle[]>([]);
+  const [chartError, setChartError] = useState<string | null>(null);
   const [ohlc, setOhlc] = useState({
     open: '--',
     high: '--',
@@ -195,6 +196,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     const startTime = performance.now();
 
     async function loadData() {
+      setChartError(null);
       try {
         const force = forceRefreshCounter > consumedForceRefreshRef.current;
         consumedForceRefreshRef.current = forceRefreshCounter;
@@ -264,9 +266,18 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
           });
 
           chartRef.current?.timeScale().scrollToRealTime();
+        } else {
+          setChartError(`No trading candle data available for ${activeStock?.symbol} on ${timeframe}.`);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Failed to load candles', err);
+        if (isSubscribed) {
+          setChartError(err?.message || 'Unable to load candles for this symbol.');
+          setCandleData([]);
+          setCandles([]);
+          candleSeriesRef.current?.setData([]);
+          volumeSeriesRef.current?.setData([]);
+        }
       }
     }
 
@@ -470,6 +481,33 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
 
       {/* Main Lightweight Charts Canvas Container */}
       <div ref={containerRef} id="chart-canvas" style={{ width: '100%', height: '100%' }} />
+
+      {/* Chart Error Overlay */}
+      {chartError && candleData.length === 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--bg-main)',
+            zIndex: 10,
+            padding: '24px',
+            textAlign: 'center',
+            gap: '12px',
+          }}
+        >
+          <div style={{ fontSize: '36px' }}>⚠️</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
+            Unable to Load Chart for {activeStock?.symbol}
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '440px', lineHeight: '1.5' }}>
+            {chartError}
+          </div>
+        </div>
+      )}
 
       {/* Note Indicator Strip (Bottom x-axis dots) */}
       <div className="note-indicator-strip" id="note-indicator-strip">

@@ -69,6 +69,17 @@ fn bad_request(msg: impl Into<String>) -> (StatusCode, Json<ErrorResponse>) {
     )
 }
 
+/// Normalize a user-supplied symbol (e.g. "MOTILALOFS" -> "MOTILALOFS.NS").
+/// Automatically appends ".NS" for Indian market symbols lacking an exchange suffix or index prefix.
+pub fn normalize_symbol(symbol: &str) -> String {
+    let sym = symbol.trim().to_uppercase();
+    if !sym.is_empty() && !sym.contains('.') && !sym.starts_with('^') {
+        format!("{sym}.NS")
+    } else {
+        sym
+    }
+}
+
 /// Validate a ticker symbol for universe membership (shared by add/delete paths).
 fn validate_universe_symbol(sym_upper: &str) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
     if sym_upper.is_empty() {
@@ -145,23 +156,17 @@ async fn add_stock(
     })?;
     let mut config = original_config.clone();
 
-    let sym_upper = new_stock.symbol.trim().to_uppercase();
+    let sym_upper = normalize_symbol(&new_stock.symbol);
     validate_universe_symbol(&sym_upper)?;
-    if new_stock.name.trim().is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Stock name cannot be empty".to_string(),
-            }),
-        ));
-    }
-    if new_stock.name.trim().chars().count() > 200 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Stock name is too long (max 200 characters)".to_string(),
-            }),
-        ));
+
+    let stock_name = if new_stock.name.trim().is_empty() {
+        sym_upper.clone()
+    } else {
+        new_stock.name.trim().to_string()
+    };
+
+    if stock_name.chars().count() > 200 {
+        return Err(bad_request("Stock name is too long (max 200 characters)"));
     }
 
     if config
@@ -177,9 +182,16 @@ async fn add_stock(
         ));
     }
 
+    // Verify ticker against Yahoo Finance before adding to universe
+    if let Err(e) = state.provider.fetch_mover(&sym_upper, &stock_name).await {
+        return Err(bad_request(format!(
+            "Symbol '{sym_upper}' could not be verified on Yahoo Finance: symbol not found or has no trading data ({e})."
+        )));
+    }
+
     let added = StockEntry {
         symbol: sym_upper.clone(),
-        name: new_stock.name.trim().to_string(),
+        name: stock_name,
     };
 
     config.stocks.push(added.clone());
@@ -233,22 +245,30 @@ async fn delete_stock(
     })?;
     let mut config = original_config.clone();
 
-    let sym_upper = symbol.trim().to_uppercase();
-    validate_universe_symbol(&sym_upper)?;
+    let raw_upper = symbol.trim().to_uppercase();
+    let norm_upper = normalize_symbol(&symbol);
+    validate_universe_symbol(&raw_upper)?;
     let initial_len = config.stocks.len();
     let found = config
         .stocks
         .iter()
-        .any(|s| s.symbol.to_uppercase() == sym_upper);
+        .find(|s| {
+            let u = s.symbol.to_uppercase();
+            u == raw_upper || u == norm_upper
+        })
+        .map(|s| s.symbol.clone());
 
-    if !found {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: format!("Stock '{symbol}' not found"),
-            }),
-        ));
-    }
+    let target_symbol = match found {
+        Some(sym) => sym,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ErrorResponse {
+                    error: format!("Stock '{symbol}' not found"),
+                }),
+            ));
+        }
+    };
 
     // The sole remaining stock cannot be removed (checked after existence so
     // a typo never reports "cannot delete last" for a stock that isn't there).
@@ -263,7 +283,7 @@ async fn delete_stock(
 
     config
         .stocks
-        .retain(|s| s.symbol.to_uppercase() != sym_upper);
+        .retain(|s| !s.symbol.eq_ignore_ascii_case(&target_symbol));
 
     config::save_stock_config(&state.config_path, &config).map_err(|e| {
         (
@@ -274,7 +294,7 @@ async fn delete_stock(
         )
     })?;
 
-    if let Err(e) = state.db.delete_ticker(&sym_upper) {
+    if let Err(e) = state.db.delete_ticker(&target_symbol) {
         let rollback = config::save_stock_config(&state.config_path, &original_config);
         let message = match rollback {
             Ok(()) => format!("Failed to delete ticker database record: {e}"),
@@ -730,4 +750,32 @@ pub async fn start_server(
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_symbol() {
+        assert_eq!(normalize_symbol("MOTILALOFS"), "MOTILALOFS.NS");
+        assert_eq!(normalize_symbol("motilalofs"), "MOTILALOFS.NS");
+        assert_eq!(normalize_symbol("  motilalofs  "), "MOTILALOFS.NS");
+        assert_eq!(normalize_symbol("RELIANCE.NS"), "RELIANCE.NS");
+        assert_eq!(normalize_symbol("reliance.ns"), "RELIANCE.NS");
+        assert_eq!(normalize_symbol("^NSEI"), "^NSEI");
+        assert_eq!(normalize_symbol("^BSESN"), "^BSESN");
+        assert_eq!(normalize_symbol("AAPL.US"), "AAPL.US");
+        assert_eq!(normalize_symbol(""), "");
+    }
+
+    #[test]
+    fn test_validate_universe_symbol() {
+        assert!(validate_universe_symbol("MOTILALOFS.NS").is_ok());
+        assert!(validate_universe_symbol("^NSEI").is_ok());
+        assert!(validate_universe_symbol("TCS-EQ.NS").is_ok());
+        assert!(validate_universe_symbol("").is_err());
+        assert!(validate_universe_symbol("INVALID SYMBOL").is_err());
+        assert!(validate_universe_symbol("TOOLONG".repeat(10).as_str()).is_err());
+    }
 }
