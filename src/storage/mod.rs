@@ -295,20 +295,38 @@ impl MarketDb {
         PathBuf::from("cache/marketwatch.db")
     }
 
-    /// Retrieve all cached candles for a given symbol and timeframe in ascending order.
+    pub const DEFAULT_MAX_CANDLES: usize = 5000;
+
+    /// Retrieve cached candles for a given symbol and timeframe in ascending order,
+    /// bounded to the most recent `DEFAULT_MAX_CANDLES` records.
     pub fn get_candles(&self, symbol: &str, timeframe: &str) -> Result<Vec<Candle>, MarketError> {
+        self.get_candles_limit(symbol, timeframe, Self::DEFAULT_MAX_CANDLES)
+    }
+
+    /// Retrieve the most recent cached candles up to `limit` records, returned in ascending order.
+    pub fn get_candles_limit(
+        &self,
+        symbol: &str,
+        timeframe: &str,
+        limit: usize,
+    ) -> Result<Vec<Candle>, MarketError> {
         let conn = self
             .conn
             .lock()
             .map_err(|e| MarketError::Database(e.to_string()))?;
         let mut stmt = conn.prepare_cached(
             "SELECT timestamp, open, high, low, close, volume 
-             FROM candles 
-             WHERE symbol = ?1 AND timeframe = ?2 
+             FROM (
+                 SELECT timestamp, open, high, low, close, volume 
+                 FROM candles 
+                 WHERE symbol = ?1 AND timeframe = ?2 
+                 ORDER BY timestamp DESC 
+                 LIMIT ?3
+             ) 
              ORDER BY timestamp ASC",
         )?;
 
-        let candle_iter = stmt.query_map(params![symbol, timeframe], |row| {
+        let candle_iter = stmt.query_map(params![symbol, timeframe, limit as i64], |row| {
             let ts: i64 = row.get(0)?;
             let open: f64 = row.get(1)?;
             let high: f64 = row.get(2)?;
@@ -1580,5 +1598,31 @@ mod tests {
             .unwrap();
         let exists = stmt.exists([]).unwrap();
         assert!(!exists, "Dead market_holidays table should not exist");
+    }
+
+    #[test]
+    fn test_get_candles_bounded_by_limit() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let candles: Vec<Candle> = (1..=10)
+            .map(|i| make_test_candle(i * 100, 100.0 + i as f64, 105.0 + i as f64))
+            .collect();
+        db.save_candles("BOUND.NS", "15m", &candles, 1000).unwrap();
+
+        // Limit 3 returns 3 most recent in ascending order
+        let limited = db.get_candles_limit("BOUND.NS", "15m", 3).unwrap();
+        assert_eq!(limited.len(), 3);
+        assert_eq!(limited[0].timestamp, 800);
+        assert_eq!(limited[1].timestamp, 900);
+        assert_eq!(limited[2].timestamp, 1000);
+
+        // Limit 50 returns all 10
+        let all = db.get_candles_limit("BOUND.NS", "15m", 50).unwrap();
+        assert_eq!(all.len(), 10);
+        assert_eq!(all[0].timestamp, 100);
+        assert_eq!(all[9].timestamp, 1000);
+
+        // Default get_candles returns all 10
+        let default_candles = db.get_candles("BOUND.NS", "15m").unwrap();
+        assert_eq!(default_candles.len(), 10);
     }
 }
