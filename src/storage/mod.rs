@@ -93,11 +93,8 @@ impl MarketDb {
                 created_at  INTEGER NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS market_holidays (
-                holiday_date        TEXT PRIMARY KEY NOT NULL,
-                description         TEXT NOT NULL,
-                is_trading_holiday  INTEGER NOT NULL DEFAULT 1
-            );",
+            -- Clean up deprecated, unused market_holidays table
+            DROP TABLE IF EXISTS market_holidays;",
         )?;
 
         // Check if candles table already exists
@@ -1571,5 +1568,17 @@ mod tests {
             plan.contains("PRIMARY KEY") || plan.contains("candles"),
             "Query plan should use clustered primary key: {plan}"
         );
+    }
+
+    #[test]
+    fn test_dead_market_holidays_table_cleaned_up() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'market_holidays'")
+            .unwrap();
+        let exists = stmt.exists([]).unwrap();
+        assert!(!exists, "Dead market_holidays table should not exist");
     }
 }
