@@ -278,15 +278,29 @@ pub fn run_service(action: &str, threshold: f64) -> anyhow::Result<()> {
 
 /// Find the config directory. Checks:
 /// 1. ./config/stocks.toml (relative to CWD — typical for development)
-/// 2. Adjacent to the executable
+/// 2. ~/.config/marketwatch/stocks.toml (user XDG/standard config location)
+/// 3. Adjacent to the executable: <exe_dir>/config/stocks.toml
 pub fn find_config_path() -> anyhow::Result<PathBuf> {
-    // Try relative to current directory first
+    // 1. Try relative to current directory first
     let cwd_path = PathBuf::from("config/stocks.toml");
     if cwd_path.exists() {
         return Ok(cwd_path);
     }
 
-    // Try relative to executable
+    // 2. Try ~/.config/marketwatch/stocks.toml (or $XDG_CONFIG_HOME/marketwatch/stocks.toml)
+    if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
+        let xdg_path = PathBuf::from(config_home).join("marketwatch/stocks.toml");
+        if xdg_path.exists() {
+            return Ok(xdg_path);
+        }
+    } else if let Some(home) = std::env::var_os("HOME") {
+        let user_path = PathBuf::from(home).join(".config/marketwatch/stocks.toml");
+        if user_path.exists() {
+            return Ok(user_path);
+        }
+    }
+
+    // 3. Try relative to executable
     if let Ok(exe) = std::env::current_exe()
         && let Some(exe_dir) = exe.parent()
     {
@@ -298,8 +312,8 @@ pub fn find_config_path() -> anyhow::Result<PathBuf> {
 
     anyhow::bail!(
         "Cannot find config/stocks.toml. \
-         Run from the project root directory, or place the config \
-         directory next to the executable."
+         Run from the project root directory, place it at ~/.config/marketwatch/stocks.toml, \
+         or place the config directory next to the executable."
     )
 }
 
