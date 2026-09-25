@@ -29,6 +29,15 @@ export const Sidebar: React.FC = React.memo(() => {
   const [newName, setNewName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
+  // Map symbol to its index in the original universe for O(1) lookups
+  const stockIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < stocks.length; i++) {
+      map.set(stocks[i].symbol, i);
+    }
+    return map;
+  }, [stocks]);
+
   // Filtered universe stocks
   const filteredStocks = useMemo(() => {
     if (!sidebarSearch.trim()) return stocks;
@@ -184,7 +193,7 @@ export const Sidebar: React.FC = React.memo(() => {
           ) : (
             filteredStocks.map(stock => {
               const isActive = activeStock?.symbol === stock.symbol;
-              const originalIndex = stocks.findIndex(s => s.symbol === stock.symbol);
+              const originalIndex = stockIndexMap.get(stock.symbol) ?? 0;
 
               return (
                 <li
