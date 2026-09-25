@@ -30,6 +30,8 @@ const DASHBOARD_HTML: &str = include_str!("index.html");
 /// Embedded SVG favicon.
 const FAVICON_SVG: &str = include_str!("favicon.svg");
 
+type InFlightScanResult = Result<ScanResult, String>;
+
 /// Shared application state for Web API endpoints.
 #[derive(Clone)]
 pub struct WebState {
@@ -37,6 +39,7 @@ pub struct WebState {
     pub provider: Arc<YahooProvider>,
     pub db: MarketDb,
     pub sync_service: CandleSyncService,
+    pub scan_in_flight: Arc<tokio::sync::Mutex<Option<tokio::sync::watch::Receiver<Option<InFlightScanResult>>>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -371,6 +374,35 @@ async fn get_candles(
     }
 }
 
+/// Filter and re-sort a cached or coalesced ScanResult by threshold percent.
+fn filter_scan_result(last: &ScanResult, threshold: f64) -> ScanResult {
+    let mut movers: Vec<StockMover> = last
+        .all_quotes
+        .iter()
+        .filter(|m| m.matches_threshold(threshold))
+        .cloned()
+        .collect();
+
+    movers.sort_by(|a, b| {
+        b.change_percent
+            .abs()
+            .partial_cmp(&a.change_percent.abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
+    let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
+    let movers_count = movers.len();
+
+    let mut updated = last.clone();
+    updated.threshold_percent = threshold;
+    updated.movers_count = movers_count;
+    updated.gainers_count = gainers_count;
+    updated.losers_count = losers_count;
+    updated.movers = movers;
+    updated
+}
+
 /// Scan movers across the universe.
 async fn scan_movers(
     State(state): State<WebState>,
@@ -382,7 +414,7 @@ async fn scan_movers(
     let force = params.force.unwrap_or(false);
 
     let state_path = ScanState::default_path();
-    let mut scan_state = ScanState::load(&state_path);
+    let scan_state = ScanState::load(&state_path);
 
     let now = chrono::Utc::now().timestamp();
     if !force
@@ -395,74 +427,83 @@ async fn scan_movers(
             (0..180).contains(&age)
         }
     {
-        let mut movers: Vec<StockMover> = last
-            .all_quotes
-            .iter()
-            .filter(|m| m.matches_threshold(threshold))
-            .cloned()
-            .collect();
-
-        movers.sort_by(|a, b| {
-            b.change_percent
-                .abs()
-                .partial_cmp(&a.change_percent.abs())
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        let gainers_count = movers.iter().filter(|m| m.is_gainer()).count();
-        let losers_count = movers.iter().filter(|m| !m.is_gainer()).count();
-        let movers_count = movers.len();
-
-        let mut updated = last.clone();
-        updated.threshold_percent = threshold;
-        updated.movers_count = movers_count;
-        updated.gainers_count = gainers_count;
-        updated.losers_count = losers_count;
-        updated.movers = movers;
-
-        return Ok(Json(updated));
+        return Ok(Json(filter_scan_result(last, threshold)));
     }
 
-    let config = config::load_stock_config(&state.config_path).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
-                error: e.to_string(),
-            }),
-        )
-    })?;
+    // Coalesce concurrent in-flight scans: if a scan is already running, wait on its watch receiver
+    let leader_tx = {
+        let mut guard = state.scan_in_flight.lock().await;
+        if let Some(ref rx) = *guard {
+            let mut follower_rx = rx.clone();
+            drop(guard);
 
-    let scanner = Scanner::new(state.provider.clone());
-    let result = scanner.scan(&config.stocks, threshold).await.map_err(|e| {
-        // Invalid thresholds are rejected above; a total provider failure is
-        // a gateway problem, not a client error.
-        let status = match e {
-            crate::error::MarketError::InvalidInput(_) => StatusCode::BAD_REQUEST,
-            crate::error::MarketError::NoData { .. } => StatusCode::NOT_FOUND,
-            crate::error::MarketError::Provider { .. } | crate::error::MarketError::Network(_) => {
-                StatusCode::BAD_GATEWAY
+            while follower_rx.borrow().is_none() {
+                if follower_rx.changed().await.is_err() {
+                    break;
+                }
             }
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        (
-            status,
-            Json(ErrorResponse {
-                error: e.to_string(),
-            }),
-        )
-    })?;
 
-    scan_state.last_scan_result = Some(result.clone());
-    scan_state.save(&state_path).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
-                error: e.to_string(),
-            }),
-        )
-    })?;
+            return match &*follower_rx.borrow() {
+                Some(Ok(scan_result)) => Ok(Json(filter_scan_result(scan_result, threshold))),
+                Some(Err(err_msg)) => Err((
+                    StatusCode::BAD_GATEWAY,
+                    Json(ErrorResponse {
+                        error: err_msg.clone(),
+                    }),
+                )),
+                None => Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: "In-flight scan terminated without result".to_string(),
+                    }),
+                )),
+            };
+        } else {
+            let (tx, rx) = tokio::sync::watch::channel(None);
+            *guard = Some(rx);
+            tx
+        }
+    };
 
-    Ok(Json(result))
+    let config_res = config::load_stock_config(&state.config_path);
+    let scan_res = match config_res {
+        Ok(config) => {
+            let scanner = Scanner::new(state.provider.clone());
+            scanner.scan(&config.stocks, threshold).await
+        }
+        Err(e) => Err(e),
+    };
+
+    // Release in-flight registration and broadcast to followers
+    {
+        let mut guard = state.scan_in_flight.lock().await;
+        *guard = None;
+    }
+
+    match scan_res {
+        Ok(result) => {
+            let mut scan_state = ScanState::load(&state_path);
+            scan_state.last_scan_result = Some(result.clone());
+            let _ = scan_state.save(&state_path);
+
+            let _ = leader_tx.send(Some(Ok(result.clone())));
+            Ok(Json(result))
+        }
+        Err(e) => {
+            let err_string = e.to_string();
+            let _ = leader_tx.send(Some(Err(err_string.clone())));
+
+            let status = match e {
+                crate::error::MarketError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+                crate::error::MarketError::NoData { .. } => StatusCode::NOT_FOUND,
+                crate::error::MarketError::Provider { .. } | crate::error::MarketError::Network(_) => {
+                    StatusCode::BAD_GATEWAY
+                }
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            Err((status, Json(ErrorResponse { error: err_string })))
+        }
+    }
 }
 
 /// Retrieve the most recent scan result from cache.
@@ -821,6 +862,7 @@ pub async fn start_server(
         provider,
         db,
         sync_service,
+        scan_in_flight: Arc::new(tokio::sync::Mutex::new(None)),
     };
 
     let app = create_router(state);
@@ -896,6 +938,7 @@ mod tests {
             provider,
             db,
             sync_service,
+            scan_in_flight: Arc::new(tokio::sync::Mutex::new(None)),
         };
 
         let app = create_router(state);
@@ -950,6 +993,90 @@ mod tests {
             .unwrap();
         // Since temp config exists, handler succeeds with 201 Created
         assert_eq!(res.status(), reqwest::StatusCode::CREATED);
+
+        let _ = std::fs::remove_file(temp_config);
+    }
+
+    #[tokio::test]
+    async fn test_scan_movers_follower_coalesces_with_leader() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let provider = Arc::new(YahooProvider::new().unwrap());
+        let sync_service = CandleSyncService::new(db.clone(), provider.clone());
+        let temp_config =
+            std::env::temp_dir().join(format!("marketwatch_scan_test_{}.toml", std::process::id()));
+        config::save_stock_config(
+            &temp_config,
+            &config::StockConfig {
+                stocks: vec![StockEntry {
+                    symbol: "INFY.NS".to_string(),
+                    name: "Infosys".to_string(),
+                }],
+            },
+        )
+        .unwrap();
+
+        // Pre-create an in-flight watch channel simulating an active leader scan
+        let (tx, rx) = tokio::sync::watch::channel(None);
+        let scan_in_flight = Arc::new(tokio::sync::Mutex::new(Some(rx)));
+
+        let state = WebState {
+            config_path: temp_config.clone(),
+            provider,
+            db,
+            sync_service,
+            scan_in_flight,
+        };
+
+        let app = create_router(state);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        // Spawn a background task to resolve the leader scan after 50ms
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            let mock_mover = StockMover {
+                symbol: "INFY.NS".to_string(),
+                name: "Infosys".to_string(),
+                price: 1600.0,
+                prev_close: 1550.0,
+                change: 50.0,
+                change_percent: 3.22,
+                volume: 100000,
+                day_high: 1610.0,
+                day_low: 1540.0,
+                timestamp: chrono::Utc::now().timestamp(),
+            };
+            let mock_result = ScanResult {
+                timestamp: chrono::Utc::now().timestamp(),
+                scan_time: "15:30:00".to_string(),
+                threshold_percent: 2.0,
+                total_scanned: 1,
+                movers_count: 1,
+                gainers_count: 1,
+                losers_count: 0,
+                movers: vec![mock_mover.clone()],
+                all_quotes: vec![mock_mover],
+                failed_count: 0,
+            };
+            let _ = tx.send(Some(Ok(mock_result)));
+        });
+
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!(
+                "http://127.0.0.1:{port}/api/scan?threshold=2.0&force=true"
+            ))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), reqwest::StatusCode::OK);
+        let body: ScanResult = res.json().await.unwrap();
+        assert_eq!(body.movers.len(), 1);
+        assert_eq!(body.movers[0].symbol, "INFY.NS");
 
         let _ = std::fs::remove_file(temp_config);
     }
