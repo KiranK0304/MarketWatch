@@ -6,8 +6,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, Query, Request, State};
 use axum::http::{StatusCode, header};
+use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{delete, get};
 use axum::{Json, Router};
@@ -687,6 +688,100 @@ async fn delete_note(
     }
 }
 
+/// Validate CSRF / Origin headers and optional auth token on state-modifying requests (POST, PUT, DELETE, PATCH).
+/// Protects local terminal endpoints from cross-origin drive-by attacks from arbitrary websites.
+async fn validate_mutation_csrf(
+    req: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, Json<ErrorResponse>)> {
+    let method = req.method();
+    if matches!(
+        method,
+        &axum::http::Method::POST
+            | &axum::http::Method::PUT
+            | &axum::http::Method::DELETE
+            | &axum::http::Method::PATCH
+    ) {
+        // Optional environment-configured Bearer token
+        if let Some(expected_token) =
+            std::env::var("MARKETWATCH_API_TOKEN").ok().filter(|t| !t.is_empty())
+        {
+            let authorized = req
+                .headers()
+                .get(header::AUTHORIZATION)
+                .and_then(|h| h.to_str().ok())
+                .and_then(|h| h.strip_prefix("Bearer "))
+                .map(|token| token == expected_token)
+                .or_else(|| {
+                    req.headers()
+                        .get("x-api-key")
+                        .and_then(|h| h.to_str().ok())
+                        .map(|key| key == expected_token)
+                })
+                .unwrap_or(false);
+
+            if !authorized {
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    Json(ErrorResponse {
+                        error: "Missing or invalid authorization token".to_string(),
+                    }),
+                ));
+            }
+        }
+
+        // 1. Block explicit cross-site fetch metadata
+        if req
+            .headers()
+            .get("sec-fetch-site")
+            .is_some_and(|sec_fetch| sec_fetch == "cross-site")
+        {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(ErrorResponse {
+                    error: "Cross-site request forgery forbidden".to_string(),
+                }),
+            ));
+        }
+
+        // 2. If Origin header is present, ensure it comes from localhost / 127.0.0.1 or matches Host
+        if let Some(origin_str) = req
+            .headers()
+            .get(header::ORIGIN)
+            .and_then(|o| o.to_str().ok())
+        {
+            let is_local = origin_str.starts_with("http://localhost")
+                || origin_str.starts_with("https://localhost")
+                || origin_str.starts_with("http://127.0.0.1")
+                || origin_str.starts_with("https://127.0.0.1");
+
+            let host_matches = req
+                .headers()
+                .get(header::HOST)
+                .and_then(|h| h.to_str().ok())
+                .is_some_and(|host| {
+                    origin_str
+                        .trim_start_matches("http://")
+                        .trim_start_matches("https://")
+                        == host
+                });
+
+            if !is_local && !host_matches {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    Json(ErrorResponse {
+                        error: format!(
+                            "Untrusted origin '{origin_str}' forbidden for state modifications"
+                        ),
+                    }),
+                ));
+            }
+        }
+    }
+
+    Ok(next.run(req).await)
+}
+
 /// Build the Axum router with all routes and middleware.
 pub fn create_router(state: WebState) -> Router {
     Router::new()
@@ -706,6 +801,7 @@ pub fn create_router(state: WebState) -> Router {
             "/api/notes/{id}",
             get(get_note).put(update_note).delete(delete_note),
         )
+        .layer(middleware::from_fn(validate_mutation_csrf))
         .with_state(state)
 }
 
@@ -777,5 +873,84 @@ mod tests {
         assert!(validate_universe_symbol("").is_err());
         assert!(validate_universe_symbol("INVALID SYMBOL").is_err());
         assert!(validate_universe_symbol("TOOLONG".repeat(10).as_str()).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_csrf_protection_mutation_endpoints() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let provider = Arc::new(YahooProvider::new().unwrap());
+        let sync_service = CandleSyncService::new(db.clone(), provider.clone());
+        let temp_config = std::env::temp_dir().join(format!("marketwatch_test_{}.toml", std::process::id()));
+        config::save_stock_config(
+            &temp_config,
+            &config::StockConfig {
+                stocks: vec![StockEntry {
+                    symbol: "RELIANCE.NS".to_string(),
+                    name: "Reliance Industries".to_string(),
+                }],
+            },
+        )
+        .unwrap();
+        let state = WebState {
+            config_path: temp_config.clone(),
+            provider,
+            db,
+            sync_service,
+        };
+
+        let app = create_router(state);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let client = reqwest::Client::new();
+
+        // 1. Cross-site Sec-Fetch-Site on POST must be rejected with 403
+        let res = client
+            .post(format!("http://127.0.0.1:{port}/api/stocks"))
+            .header("sec-fetch-site", "cross-site")
+            .header("content-type", "application/json")
+            .body(r#"{"symbol":"TCS.NS","name":"TCS"}"#)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), reqwest::StatusCode::FORBIDDEN);
+
+        // 2. Untrusted Origin on POST must be rejected with 403
+        let res = client
+            .post(format!("http://127.0.0.1:{port}/api/stocks"))
+            .header("origin", "https://malicious-site.com")
+            .header("content-type", "application/json")
+            .body(r#"{"symbol":"TCS.NS","name":"TCS"}"#)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), reqwest::StatusCode::FORBIDDEN);
+
+        // 3. GET requests with untrusted origin are not blocked by CSRF middleware
+        let res = client
+            .get(format!("http://127.0.0.1:{port}/api/stocks"))
+            .header("origin", "https://malicious-site.com")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), reqwest::StatusCode::OK);
+
+        // 4. Trusted localhost origin on POST is accepted through middleware
+        let res = client
+            .post(format!("http://127.0.0.1:{port}/api/stocks"))
+            .header("origin", format!("http://127.0.0.1:{port}"))
+            .header("sec-fetch-site", "same-origin")
+            .header("content-type", "application/json")
+            .body(r#"{"symbol":"TCS.NS","name":"TCS"}"#)
+            .send()
+            .await
+            .unwrap();
+        // Since temp config exists, handler succeeds with 201 Created
+        assert_eq!(res.status(), reqwest::StatusCode::CREATED);
+
+        let _ = std::fs::remove_file(temp_config);
     }
 }
