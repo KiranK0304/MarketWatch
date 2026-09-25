@@ -41,72 +41,85 @@ pub struct ExpectedCandle {
     pub is_forming: bool,
 }
 
+use std::sync::LazyLock;
+
+static STANDARD_HOLIDAYS_LIST: &[&str] = &[
+    // 2024
+    "2024-01-22", // Special Ram Mandir Pran Pratishtha
+    "2024-01-26", // Republic Day
+    "2024-03-08", // Mahashivratri
+    "2024-03-25", // Holi
+    "2024-03-29", // Good Friday
+    "2024-04-11", // Id-Ul-Fitr
+    "2024-04-17", // Ram Navami
+    "2024-05-01", // Maharashtra Day
+    "2024-05-20", // General Election
+    "2024-06-17", // Bakri Id
+    "2024-07-17", // Muharram
+    "2024-08-15", // Independence Day
+    "2024-10-02", // Mahatma Gandhi Jayanti
+    "2024-11-01", // Diwali Laxmi Pujan
+    "2024-11-15", // Gurunanak Jayanti
+    "2024-11-20", // Assembly Election
+    "2024-12-25", // Christmas
+    // 2025
+    "2025-02-26", // Mahashivratri
+    "2025-03-14", // Holi
+    "2025-03-31", // Id-Ul-Fitr
+    "2025-04-10", // Mahavir Jayanti
+    "2025-04-14", // Dr. Ambedkar Jayanti
+    "2025-04-18", // Good Friday
+    "2025-05-01", // Maharashtra Day
+    "2025-08-15", // Independence Day
+    "2025-08-27", // Ganesh Chaturthi
+    "2025-10-02", // Mahatma Gandhi Jayanti / Dussehra
+    "2025-10-21", // Diwali Laxmi Pujan
+    "2025-10-22", // Diwali Balipratipada
+    "2025-11-05", // Gurunanak Jayanti
+    "2025-12-25", // Christmas
+    // 2026
+    "2026-01-26", // Republic Day (Mon)
+    "2026-03-03", // Holi (Tue)
+    "2026-03-20", // Id-Ul-Fitr (Fri)
+    "2026-03-31", // Mahavir Jayanti (Tue)
+    "2026-04-03", // Good Friday (Fri)
+    "2026-04-14", // Dr. Ambedkar Jayanti (Tue)
+    "2026-05-01", // Maharashtra Day (Fri)
+    "2026-05-27", // Bakri Id (Wed)
+    "2026-06-25", // Muharram (Thu)
+    "2026-09-14", // Ganesh Chaturthi (Mon)
+    "2026-10-02", // Mahatma Gandhi Jayanti (Fri)
+    "2026-10-20", // Dussehra (Tue)
+    "2026-11-24", // Gurunanak Jayanti (Tue)
+    "2026-12-25", // Christmas (Fri)
+    // 2027
+    "2027-01-26", // Republic Day (Tue)
+    "2027-03-22", // Holi (Mon)
+    "2027-03-26", // Good Friday (Fri)
+    "2027-04-14", // Dr. Ambedkar Jayanti (Wed)
+    "2027-10-29", // Diwali (Fri)
+    // 2028
+    "2028-01-26", // Republic Day (Wed)
+    "2028-03-10", // Holi (Fri)
+    "2028-04-14", // Good Friday / Ambedkar Jayanti (Fri)
+    "2028-05-01", // Maharashtra Day (Mon)
+    "2028-08-15", // Independence Day (Tue)
+    "2028-10-02", // Gandhi Jayanti (Mon)
+    "2028-10-17", // Diwali (Tue)
+    "2028-12-25", // Christmas (Mon)
+];
+
+static STANDARD_HOLIDAYS_SET: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| STANDARD_HOLIDAYS_LIST.iter().copied().collect());
+
 /// Indian Market Trading Calendar.
 pub struct MarketCalendar;
 
 impl MarketCalendar {
     /// Return the static set of known official NSE trading holidays (YYYY-MM-DD).
+    #[allow(dead_code)]
     pub fn standard_holidays() -> HashSet<&'static str> {
-        let mut h = HashSet::new();
-        // 2024
-        h.insert("2024-01-22"); // Special Ram Mandir Pran Pratishtha
-        h.insert("2024-01-26"); // Republic Day
-        h.insert("2024-03-08"); // Mahashivratri
-        h.insert("2024-03-25"); // Holi
-        h.insert("2024-03-29"); // Good Friday
-        h.insert("2024-04-11"); // Id-Ul-Fitr
-        h.insert("2024-04-17"); // Ram Navami
-        h.insert("2024-05-01"); // Maharashtra Day
-        h.insert("2024-05-20"); // General Election
-        h.insert("2024-06-17"); // Bakri Id
-        h.insert("2024-07-17"); // Muharram
-        h.insert("2024-08-15"); // Independence Day
-        h.insert("2024-10-02"); // Mahatma Gandhi Jayanti
-        h.insert("2024-11-01"); // Diwali Laxmi Pujan
-        h.insert("2024-11-15"); // Gurunanak Jayanti
-        h.insert("2024-11-20"); // Assembly Election
-        h.insert("2024-12-25"); // Christmas
-
-        // 2025
-        h.insert("2025-02-26"); // Mahashivratri
-        h.insert("2025-03-14"); // Holi
-        h.insert("2025-03-31"); // Id-Ul-Fitr
-        h.insert("2025-04-10"); // Mahavir Jayanti
-        h.insert("2025-04-14"); // Dr. Ambedkar Jayanti
-        h.insert("2025-04-18"); // Good Friday
-        h.insert("2025-05-01"); // Maharashtra Day
-        h.insert("2025-08-15"); // Independence Day
-        h.insert("2025-08-27"); // Ganesh Chaturthi
-        h.insert("2025-10-02"); // Mahatma Gandhi Jayanti / Dussehra
-        h.insert("2025-10-21"); // Diwali Laxmi Pujan
-        h.insert("2025-10-22"); // Diwali Balipratipada
-        h.insert("2025-11-05"); // Gurunanak Jayanti
-        h.insert("2025-12-25"); // Christmas
-
-        // 2026
-        h.insert("2026-01-26"); // Republic Day (Mon)
-        h.insert("2026-03-03"); // Holi (Tue)
-        h.insert("2026-03-20"); // Id-Ul-Fitr (Fri)
-        h.insert("2026-03-31"); // Mahavir Jayanti (Tue)
-        h.insert("2026-04-03"); // Good Friday (Fri)
-        h.insert("2026-04-14"); // Dr. Ambedkar Jayanti (Tue)
-        h.insert("2026-05-01"); // Maharashtra Day (Fri)
-        h.insert("2026-05-27"); // Bakri Id (Wed)
-        h.insert("2026-06-25"); // Muharram (Thu)
-        h.insert("2026-09-14"); // Ganesh Chaturthi (Mon)
-        h.insert("2026-10-02"); // Mahatma Gandhi Jayanti (Fri)
-        h.insert("2026-10-20"); // Dussehra (Tue)
-        h.insert("2026-11-24"); // Gurunanak Jayanti (Tue)
-        h.insert("2026-12-25"); // Christmas (Fri)
-
-        // 2027
-        h.insert("2027-01-26"); // Republic Day (Tue)
-        h.insert("2027-03-22"); // Holi (Mon)
-        h.insert("2027-03-26"); // Good Friday (Fri)
-        h.insert("2027-04-14"); // Dr. Ambedkar Jayanti (Wed)
-        h.insert("2027-10-29"); // Diwali (Fri)
-
-        h
+        STANDARD_HOLIDAYS_SET.clone()
     }
 
     /// Check if a date is a recognized trading day (Monday–Friday and not an official holiday).
@@ -116,8 +129,21 @@ impl MarketCalendar {
             return false;
         }
 
+        // Fixed annual Indian national and state holidays (valid for all current and future years)
+        if matches!(
+            (date.month(), date.day()),
+            (1, 26)   // Republic Day
+            | (4, 14) // Dr. Ambedkar Jayanti
+            | (5, 1)  // Maharashtra Day
+            | (8, 15) // Independence Day
+            | (10, 2) // Mahatma Gandhi Jayanti
+            | (12, 25) // Christmas
+        ) {
+            return false;
+        }
+
         let date_str = date.format("%Y-%m-%d").to_string();
-        !Self::standard_holidays().contains(date_str.as_str())
+        !STANDARD_HOLIDAYS_SET.contains(date_str.as_str())
     }
 
     /// Check if the market is open at the given timestamp in IST.
@@ -474,5 +500,17 @@ mod tests {
         assert_eq!(aligned_5m_dt.hour(), 11);
         assert_eq!(aligned_5m_dt.minute(), 35);
         assert_eq!(aligned_5m_dt.second(), 0);
+    }
+
+    #[test]
+    fn test_annual_fixed_holidays_future_years() {
+        // Years beyond 2027 should still recognize annual national holidays
+        let independence_day_2028 = NaiveDate::from_ymd_opt(2028, 8, 15).unwrap(); // Tuesday
+        let republic_day_2029 = NaiveDate::from_ymd_opt(2029, 1, 26).unwrap(); // Friday
+        let gandhi_jayanti_2030 = NaiveDate::from_ymd_opt(2030, 10, 2).unwrap(); // Wednesday
+
+        assert!(!MarketCalendar::is_trading_day(independence_day_2028));
+        assert!(!MarketCalendar::is_trading_day(republic_day_2029));
+        assert!(!MarketCalendar::is_trading_day(gandhi_jayanti_2030));
     }
 }
