@@ -7,6 +7,15 @@ use crate::domain::Timeframe;
 /// Allowed statuses for a stock note.
 pub const VALID_NOTE_STATUSES: &[&str] = &["open", "validated", "invalidated", "cancelled"];
 
+/// Maximum allowed length for note title.
+pub const MAX_NOTE_TITLE_LEN: usize = 200;
+/// Maximum allowed length for note content.
+pub const MAX_NOTE_CONTENT_LEN: usize = 10_000;
+/// Maximum allowed length for note tags.
+pub const MAX_NOTE_TAGS_LEN: usize = 500;
+/// Maximum allowed length for outcome note.
+pub const MAX_NOTE_OUTCOME_LEN: usize = 5_000;
+
 /// Check if a status string is valid.
 pub fn is_valid_status(status: &str) -> bool {
     VALID_NOTE_STATUSES.contains(&status.trim())
@@ -76,12 +85,24 @@ impl CreateNoteInput {
         if title.is_empty() {
             return Err("Note title cannot be empty".to_string());
         }
-        if title.len() > 200 {
-            return Err("Note title exceeds maximum length of 200 characters".to_string());
+        if title.len() > MAX_NOTE_TITLE_LEN {
+            return Err(format!(
+                "Note title exceeds maximum length of {MAX_NOTE_TITLE_LEN} characters"
+            ));
         }
         let content = self.content.trim();
         if content.is_empty() {
             return Err("Note content cannot be empty".to_string());
+        }
+        if content.len() > MAX_NOTE_CONTENT_LEN {
+            return Err(format!(
+                "Note content exceeds maximum length of {MAX_NOTE_CONTENT_LEN} characters"
+            ));
+        }
+        if self.tags.len() > MAX_NOTE_TAGS_LEN {
+            return Err(format!(
+                "Note tags exceed maximum length of {MAX_NOTE_TAGS_LEN} characters"
+            ));
         }
         if !self.price_at_note.is_finite() || self.price_at_note <= 0.0 {
             return Err("Price at note must be a positive finite number".to_string());
@@ -138,14 +159,36 @@ impl UpdateNoteInput {
             if t.is_empty() {
                 return Err("Note title cannot be empty".to_string());
             }
-            if t.len() > 200 {
-                return Err("Note title exceeds maximum length of 200 characters".to_string());
+            if t.len() > MAX_NOTE_TITLE_LEN {
+                return Err(format!(
+                    "Note title exceeds maximum length of {MAX_NOTE_TITLE_LEN} characters"
+                ));
             }
         }
-        if let Some(ref content) = self.content
-            && content.trim().is_empty()
+        if let Some(ref content) = self.content {
+            let c = content.trim();
+            if c.is_empty() {
+                return Err("Note content cannot be empty".to_string());
+            }
+            if content.len() > MAX_NOTE_CONTENT_LEN {
+                return Err(format!(
+                    "Note content exceeds maximum length of {MAX_NOTE_CONTENT_LEN} characters"
+                ));
+            }
+        }
+        if let Some(ref tags) = self.tags
+            && tags.len() > MAX_NOTE_TAGS_LEN
         {
-            return Err("Note content cannot be empty".to_string());
+            return Err(format!(
+                "Note tags exceed maximum length of {MAX_NOTE_TAGS_LEN} characters"
+            ));
+        }
+        if let Some(Some(ref outcome)) = self.outcome_note
+            && outcome.len() > MAX_NOTE_OUTCOME_LEN
+        {
+            return Err(format!(
+                "Outcome note exceeds maximum length of {MAX_NOTE_OUTCOME_LEN} characters"
+            ));
         }
         if let Some(ref status) = self.status
             && !is_valid_status(status)
@@ -217,6 +260,18 @@ mod tests {
         input.target_price = Some(-5.0);
         assert!(input.validate().is_err());
         input.target_price = Some(1720.0);
+        assert!(input.validate().is_ok());
+
+        // Content too long
+        input.content = "a".repeat(MAX_NOTE_CONTENT_LEN + 1);
+        assert!(input.validate().is_err());
+        input.content = "a".repeat(MAX_NOTE_CONTENT_LEN);
+        assert!(input.validate().is_ok());
+
+        // Tags too long
+        input.tags = "t".repeat(MAX_NOTE_TAGS_LEN + 1);
+        assert!(input.validate().is_err());
+        input.tags = "breakout".to_string();
         assert!(input.validate().is_ok());
     }
 
