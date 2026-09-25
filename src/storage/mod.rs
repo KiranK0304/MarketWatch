@@ -796,12 +796,26 @@ impl MarketDb {
 
     /// Delete a ticker by symbol. Due to `ON DELETE CASCADE`, all associated
     /// candles and sync metadata are also deleted automatically.
+    #[allow(dead_code)]
     pub fn delete_ticker(&self, symbol: &str) -> Result<bool, MarketError> {
         let conn = self
             .conn
             .lock()
             .map_err(|e| MarketError::Database(e.to_string()))?;
         let affected = conn.execute("DELETE FROM tickers WHERE symbol = ?1", params![symbol])?;
+        Ok(affected > 0)
+    }
+
+    /// Deactivate a ticker by symbol (mark as inactive without cascading deletes to candles or notes).
+    pub fn deactivate_ticker(&self, symbol: &str) -> Result<bool, MarketError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| MarketError::Database(e.to_string()))?;
+        let affected = conn.execute(
+            "UPDATE tickers SET is_active = 0 WHERE symbol = ?1",
+            params![symbol],
+        )?;
         Ok(affected > 0)
     }
 
@@ -1484,5 +1498,49 @@ mod tests {
         db.delete_ticker("HDFCBANK.NS").unwrap();
         let notes_after = db.list_notes(Some("HDFCBANK.NS"), None).unwrap();
         assert_eq!(notes_after.len(), 0);
+    }
+
+    #[test]
+    fn test_deactivate_ticker_preserves_notes_and_candles() {
+        let db = MarketDb::open_in_memory().unwrap();
+        let ticker = Ticker {
+            symbol: "INFY.NS".to_string(),
+            name: "Infosys Limited".to_string(),
+            exchange: "NSE".to_string(),
+            is_active: true,
+            created_at: 1000,
+        };
+        db.upsert_ticker(&ticker).unwrap();
+
+        let candle = make_test_candle(1000, 1500.0, 1520.0);
+        db.save_candles("INFY.NS", "15m", &[candle], 1000).unwrap();
+
+        let input = CreateNoteInput {
+            symbol: "INFY.NS".to_string(),
+            timeframe: "15m".to_string(),
+            candle_timestamp: Some(1000),
+            price_at_note: 1520.0,
+            title: "Long Setup".to_string(),
+            content: "Consolidation break".to_string(),
+            tags: "breakout".to_string(),
+            target_price: Some(1580.0),
+            stop_loss: Some(1490.0),
+            reference_note_ids: vec![],
+        };
+        let note = db.create_note(&input).unwrap();
+
+        // Deactivating the ticker must set is_active=false but keep candles and notes intact
+        let deactivated = db.deactivate_ticker("INFY.NS").unwrap();
+        assert!(deactivated);
+
+        let fetched_ticker = db.get_ticker("INFY.NS").unwrap().expect("ticker still exists");
+        assert!(!fetched_ticker.is_active);
+
+        let notes = db.list_notes(Some("INFY.NS"), None).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id, note.id);
+
+        let candles = db.get_candles("INFY.NS", "15m").unwrap();
+        assert_eq!(candles.len(), 1);
     }
 }

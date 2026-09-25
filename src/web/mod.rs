@@ -294,13 +294,13 @@ async fn delete_stock(
         )
     })?;
 
-    if let Err(e) = state.db.delete_ticker(&target_symbol) {
+    if let Err(e) = state.db.deactivate_ticker(&target_symbol) {
         let rollback = config::save_stock_config(&state.config_path, &original_config);
         let message = match rollback {
-            Ok(()) => format!("Failed to delete ticker database record: {e}"),
+            Ok(()) => format!("Failed to deactivate ticker database record: {e}"),
             Err(rollback_error) => {
                 format!(
-                    "Failed to delete ticker database record: {e}; config rollback also failed: {rollback_error}"
+                    "Failed to deactivate ticker database record: {e}; config rollback also failed: {rollback_error}"
                 )
             }
         };
