@@ -13,6 +13,7 @@ use crate::provider::yahoo::YahooProvider;
 use crate::scanner::{
     ScanState, Scanner, ServiceManager, now_ist, send_desktop_notification, show_popup_dialog,
 };
+#[cfg(feature = "gui")]
 use crate::ui::chart;
 
 /// Run the full application flow for native GUI:
@@ -42,10 +43,18 @@ pub async fn run(timeframe: Timeframe, symbol_arg: Option<&str>) -> anyhow::Resu
     );
 
     // Display chart
-    chart::show_chart(candles, &stock.symbol, timeframe)
-        .map_err(|e| anyhow::anyhow!("Failed to launch chart window: {e}"))?;
+    #[cfg(feature = "gui")]
+    {
+        chart::show_chart(candles, &stock.symbol, timeframe)
+            .map_err(|e| anyhow::anyhow!("Failed to launch chart window: {e}"))?;
+        Ok(())
+    }
 
-    Ok(())
+    #[cfg(not(feature = "gui"))]
+    {
+        let _ = (candles, &stock.symbol, timeframe);
+        anyhow::bail!("Native GUI was not compiled. Rebuild with default features or run with --web.");
+    }
 }
 
 /// Run scanner across stock universe.

@@ -5,19 +5,24 @@
 //! - The body spanning open→close (colored green/red)
 //! - The wick spanning low→high
 
+#[cfg(feature = "gui")]
 use eframe::egui;
+#[cfg(feature = "gui")]
 use egui::Color32;
+#[cfg(feature = "gui")]
 use egui_plot::{BoxElem, BoxPlot, BoxSpread, Plot, PlotPoint, Text as PlotText};
 
 use crate::domain::{Candle, Timeframe};
 
 /// The egui application state for the chart window.
+#[cfg(feature = "gui")]
 pub struct ChartApp {
     candles: Vec<Candle>,
     symbol: String,
     timeframe: Timeframe,
 }
 
+#[cfg(feature = "gui")]
 impl ChartApp {
     pub fn new(candles: Vec<Candle>, symbol: String, timeframe: Timeframe) -> Self {
         Self {
@@ -29,11 +34,16 @@ impl ChartApp {
 }
 
 /// Colors for the chart.
+#[cfg(feature = "gui")]
 const BULLISH_COLOR: Color32 = Color32::from_rgb(38, 166, 91); // Green
+#[cfg(feature = "gui")]
 const BEARISH_COLOR: Color32 = Color32::from_rgb(214, 48, 49); // Red
+#[cfg(feature = "gui")]
 const BULLISH_FILL: Color32 = Color32::from_rgb(38, 166, 91);
+#[cfg(feature = "gui")]
 const BEARISH_FILL: Color32 = Color32::from_rgb(214, 48, 49);
 
+#[cfg(feature = "gui")]
 impl eframe::App for ChartApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -141,6 +151,7 @@ impl eframe::App for ChartApp {
 }
 
 /// Build time labels: select evenly spaced candles for x-axis annotation.
+#[allow(dead_code)]
 fn build_time_labels(candles: &[Candle], timeframe: Timeframe) -> Vec<(f64, String)> {
     if candles.is_empty() {
         return vec![];
@@ -162,6 +173,7 @@ fn build_time_labels(candles: &[Candle], timeframe: Timeframe) -> Vec<(f64, Stri
 }
 
 /// Format volume with K/M/B suffixes for readability.
+#[allow(dead_code)]
 fn format_volume(vol: u64) -> String {
     if vol >= 1_000_000_000 {
         format!("{:.1}B", vol as f64 / 1_000_000_000.0)
@@ -175,6 +187,7 @@ fn format_volume(vol: u64) -> String {
 }
 
 /// Launch the chart window with the given candle data.
+#[cfg(feature = "gui")]
 pub fn show_chart(candles: Vec<Candle>, symbol: &str, timeframe: Timeframe) -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
