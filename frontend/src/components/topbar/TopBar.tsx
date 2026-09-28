@@ -30,15 +30,33 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({ heroPrice, heroChange
     setZoom,
     zoomIn,
     zoomOut,
+    journalStocks,
+    watchlists,
+    activeWatchlistId,
   } = useApp();
 
   const timeframes: Timeframe[] = ['5m', '15m', '30m', '1h', '1d', '1w'];
 
   // Grid pagination calculations (reflecting sidebar tab and search)
-  const gridItems =
-    sidebarTab === 'universe'
-      ? stocks
-      : filteredMovers.map(m => ({ symbol: m.symbol, name: m.name }));
+  const gridItems = React.useMemo(() => {
+    switch (sidebarTab) {
+      case 'movers':
+        return filteredMovers.map(m => ({ symbol: m.symbol, name: m.name || m.symbol }));
+      case 'journal':
+        return journalStocks;
+      case 'watchlist': {
+        const wl = watchlists.find(w => w.id === activeWatchlistId);
+        if (!wl) return [];
+        return wl.symbols.map(sym => {
+          const found = stocks.find(s => s.symbol.toUpperCase() === sym.toUpperCase());
+          return found || { symbol: sym, name: sym };
+        });
+      }
+      default:
+        return stocks;
+    }
+  }, [sidebarTab, stocks, filteredMovers, journalStocks, watchlists, activeWatchlistId]);
+
   const gridQuery = sidebarSearch.trim().toLowerCase();
   const totalGridItems = gridQuery
     ? gridItems.filter(

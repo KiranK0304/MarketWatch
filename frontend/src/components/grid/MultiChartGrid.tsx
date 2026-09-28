@@ -163,6 +163,9 @@ export const MultiChartGrid: React.FC = () => {
   const {
     stocks,
     filteredMovers,
+    journalStocks,
+    watchlists,
+    activeWatchlistId,
     sidebarTab,
     sidebarSearch,
     gridPage,
@@ -173,11 +176,25 @@ export const MultiChartGrid: React.FC = () => {
     setViewMode,
   } = useApp();
 
-  // Filter items based on active sidebar tab (Universe vs Movers) and sidebarSearch query
-  const items =
-    sidebarTab === 'universe'
-      ? stocks
-      : filteredMovers.map(m => ({ symbol: m.symbol, name: m.name || m.symbol }));
+  // Filter items based on active sidebar tab (Universe, Movers, Journal, Watchlist)
+  const items: Stock[] = React.useMemo(() => {
+    switch (sidebarTab) {
+      case 'movers':
+        return filteredMovers.map(m => ({ symbol: m.symbol, name: m.name || m.symbol }));
+      case 'journal':
+        return journalStocks;
+      case 'watchlist': {
+        const wl = watchlists.find(w => w.id === activeWatchlistId);
+        if (!wl) return [];
+        return wl.symbols.map(sym => {
+          const found = stocks.find(s => s.symbol.toUpperCase() === sym.toUpperCase());
+          return found || { symbol: sym, name: sym };
+        });
+      }
+      default:
+        return stocks;
+    }
+  }, [sidebarTab, stocks, filteredMovers, journalStocks, watchlists, activeWatchlistId]);
 
   const filteredItems = items.filter(s => {
     if (!sidebarSearch.trim()) return true;
