@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type {
   DrawerTab,
   GridScope,
@@ -13,6 +13,7 @@ import type {
   Timeframe,
   ViewMode,
   Candle,
+  Watchlist,
 } from '../types';
 import { api } from '../api/client';
 
@@ -48,6 +49,27 @@ interface AppContextValue {
   setSidebarTab: (tab: SidebarTab) => void;
   sidebarSearch: string;
   setSidebarSearch: (q: string) => void;
+
+  // Watchlists
+  watchlists: Watchlist[];
+  activeWatchlistId: string | null;
+  setActiveWatchlistId: (id: string | null) => void;
+  createWatchlist: (name: string) => void;
+  deleteWatchlist: (id: string) => void;
+  renameWatchlist: (id: string, name: string) => void;
+  addToWatchlist: (watchlistId: string, symbol: string) => void;
+  removeFromWatchlist: (watchlistId: string, symbol: string) => void;
+  toggleWatchlistSymbol: (watchlistId: string, symbol: string) => void;
+
+  // Journal Stocks (auto-populated from notes)
+  journalStocks: Stock[];
+  refreshJournalStocks: () => Promise<void>;
+
+  // Sidebar panel width (resizable)
+  sidebarWidth: number;
+  setSidebarWidth: (w: number) => void;
+  drawerWidth: number;
+  setDrawerWidth: (w: number) => void;
 
   // Grid
   gridScope: GridScope;
@@ -138,6 +160,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Sidebar
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('universe');
   const [sidebarSearch, setSidebarSearch] = useState<string>('');
+
+  // Watchlists (persisted in localStorage)
+  const [watchlists, setWatchlists] = useState<Watchlist[]>(() => {
+    try {
+      const saved = localStorage.getItem('mw_watchlists');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [activeWatchlistId, setActiveWatchlistId] = useState<string | null>(() => {
+    return localStorage.getItem('mw_active_watchlist') || null;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mw_watchlists', JSON.stringify(watchlists));
+  }, [watchlists]);
+
+  useEffect(() => {
+    if (activeWatchlistId) {
+      localStorage.setItem('mw_active_watchlist', activeWatchlistId);
+    } else {
+      localStorage.removeItem('mw_active_watchlist');
+    }
+  }, [activeWatchlistId]);
+
+  // Journal Stocks (auto-populated from notes API)
+  const [journalStocks, setJournalStocks] = useState<Stock[]>([]);
+  const journalFetchGeneration = useRef(0);
+
+  // Resizable panel widths (persisted in localStorage)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('mw_sidebar_width');
+    const parsed = saved ? parseInt(saved, 10) : 300;
+    return Number.isFinite(parsed) && parsed >= 180 && parsed <= 600 ? parsed : 300;
+  });
+  const [drawerWidth, setDrawerWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('mw_drawer_width');
+    const parsed = saved ? parseInt(saved, 10) : 380;
+    return Number.isFinite(parsed) && parsed >= 250 && parsed <= 700 ? parsed : 380;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mw_sidebar_width', String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('mw_drawer_width', String(drawerWidth));
+  }, [drawerWidth]);
 
   // Grid
   const [gridScope, setGridScope] = useState<GridScope>('universe');
@@ -256,6 +325,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Refresh stocks that have journal notes
+  const refreshJournalStocks = useCallback(async () => {
+    const gen = ++journalFetchGeneration.current;
+    try {
+      const notes = await api.getNotes();
+      if (gen !== journalFetchGeneration.current) return;
+      const seen = new Set<string>();
+      const list: Stock[] = [];
+      for (const n of notes) {
+        const sym = n.symbol.toUpperCase();
+        if (!seen.has(sym)) {
+          seen.add(sym);
+          const found = stocks.find(s => s.symbol.toUpperCase() === sym);
+          list.push(found || { symbol: sym, name: sym });
+        }
+      }
+      setJournalStocks(list);
+    } catch (_) {
+      // ignore
+    }
+  }, [stocks]);
+
   // Initial load
   useEffect(() => {
     reloadStocks();
@@ -264,6 +355,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(updateMarketStatus, 60000);
     return () => clearInterval(interval);
   }, [reloadStocks, loadCachedMovers, updateMarketStatus]);
+
+  // Watchlist active ID fallback
+  useEffect(() => {
+    if ((!activeWatchlistId || !watchlists.some(w => w.id === activeWatchlistId)) && watchlists.length > 0) {
+      setActiveWatchlistId(watchlists[0].id);
+    }
+  }, [watchlists, activeWatchlistId]);
+
+  // Fetch journal stocks on change
+  useEffect(() => {
+    refreshJournalStocks();
+  }, [refreshJournalStocks, forceRefreshCounter]);
 
   // Active stock derivation
   const activeStock = useMemo(() => {
@@ -288,15 +391,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [stocks]
   );
 
+  // Filtered movers, prioritizing all_quotes for instant client-side threshold filtering
+  const filteredMovers = useMemo(() => {
+    let list: StockMover[] = [];
+    if (Array.isArray(movers?.all_quotes) && movers!.all_quotes.length > 0) {
+      list = movers!.all_quotes.filter(m => Math.abs(m.change_percent) >= moversThreshold);
+    } else if (Array.isArray(movers?.movers)) {
+      list = movers!.movers.filter(m => Math.abs(m.change_percent) >= moversThreshold);
+    }
+    list = [...list].sort((a, b) => Math.abs(b.change_percent) - Math.abs(a.change_percent));
+    if (moversFilter === 'gainers') return list.filter(m => m.change_percent >= 0);
+    if (moversFilter === 'losers') return list.filter(m => m.change_percent < 0);
+    return list;
+  }, [movers, moversFilter, moversThreshold]);
+
+  // Get the list of symbols for the currently active sidebar tab, respecting any active search query
+  const activeTabSymbols = useMemo((): string[] => {
+    const q = sidebarSearch.trim().toLowerCase();
+    switch (sidebarTab) {
+      case 'movers': {
+        const list = q
+          ? filteredMovers.filter(
+              m => m.symbol.toLowerCase().includes(q) || (m.name && m.name.toLowerCase().includes(q))
+            )
+          : filteredMovers;
+        return list.map(m => m.symbol);
+      }
+      case 'journal': {
+        const list = q
+          ? journalStocks.filter(
+              s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+            )
+          : journalStocks;
+        return list.map(s => s.symbol);
+      }
+      case 'watchlist': {
+        if (!activeWatchlistId) return [];
+        const wl = watchlists.find(w => w.id === activeWatchlistId);
+        if (!wl) return [];
+        const syms = wl.symbols;
+        if (!q) return syms;
+        return syms.filter(sym => sym.toLowerCase().includes(q));
+      }
+      default: { // 'universe'
+        const list = q
+          ? stocks.filter(
+              s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+            )
+          : stocks;
+        return list.map(s => s.symbol);
+      }
+    }
+  }, [sidebarTab, sidebarSearch, stocks, filteredMovers, journalStocks, activeWatchlistId, watchlists]);
+
   const nextStock = useCallback(() => {
-    if (stocks.length === 0) return;
-    setCurrentIndex(prev => (prev + 1) % stocks.length);
-  }, [stocks.length]);
+    const syms = activeTabSymbols;
+    if (syms.length === 0) return;
+    const currentSym = activeStock?.symbol?.toUpperCase() || '';
+    const idx = syms.findIndex(s => s.toUpperCase() === currentSym);
+    const nextIdx = idx === -1 ? 0 : (idx + 1) % syms.length;
+    selectStock(syms[nextIdx]);
+  }, [activeTabSymbols, activeStock, selectStock]);
 
   const prevStock = useCallback(() => {
-    if (stocks.length === 0) return;
-    setCurrentIndex(prev => (prev - 1 + stocks.length) % stocks.length);
-  }, [stocks.length]);
+    const syms = activeTabSymbols;
+    if (syms.length === 0) return;
+    const currentSym = activeStock?.symbol?.toUpperCase() || '';
+    const idx = syms.findIndex(s => s.toUpperCase() === currentSym);
+    const prevIdx = idx === -1 ? 0 : (idx - 1 + syms.length) % syms.length;
+    selectStock(syms[prevIdx]);
+  }, [activeTabSymbols, activeStock, selectStock]);
 
   const addStock = useCallback(
     async (symbol: string, name: string) => {
@@ -348,19 +512,103 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [stocks, showToast]
   );
 
-  // Filtered movers, prioritizing all_quotes for instant client-side threshold filtering
-  const filteredMovers = useMemo(() => {
-    let list: StockMover[] = [];
-    if (Array.isArray(movers?.all_quotes) && movers!.all_quotes.length > 0) {
-      list = movers!.all_quotes.filter(m => Math.abs(m.change_percent) >= moversThreshold);
-    } else if (Array.isArray(movers?.movers)) {
-      list = movers!.movers.filter(m => Math.abs(m.change_percent) >= moversThreshold);
-    }
-    list = [...list].sort((a, b) => Math.abs(b.change_percent) - Math.abs(a.change_percent));
-    if (moversFilter === 'gainers') return list.filter(m => m.change_percent >= 0);
-    if (moversFilter === 'losers') return list.filter(m => m.change_percent < 0);
-    return list;
-  }, [movers, moversFilter, moversThreshold]);
+  // Watchlists operations
+  const createWatchlist = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const newWl: Watchlist = {
+        id: `wl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        name: trimmed,
+        symbols: [],
+        createdAt: Date.now(),
+      };
+      setWatchlists(prev => [...prev, newWl]);
+      setActiveWatchlistId(newWl.id);
+      showToast(`Created watchlist "${trimmed}"`);
+    },
+    [showToast]
+  );
+
+  const deleteWatchlist = useCallback(
+    (id: string) => {
+      setWatchlists(prev => {
+        const target = prev.find(w => w.id === id);
+        if (target) showToast(`Deleted watchlist "${target.name}"`);
+        return prev.filter(w => w.id !== id);
+      });
+      setActiveWatchlistId(prev => {
+        if (prev === id) {
+          const remaining = watchlists.filter(w => w.id !== id);
+          return remaining.length > 0 ? remaining[0].id : null;
+        }
+        return prev;
+      });
+    },
+    [showToast, watchlists]
+  );
+
+  const renameWatchlist = useCallback(
+    (id: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      setWatchlists(prev => prev.map(w => (w.id === id ? { ...w, name: trimmed } : w)));
+      showToast(`Renamed watchlist to "${trimmed}"`);
+    },
+    [showToast]
+  );
+
+  const addToWatchlist = useCallback(
+    (watchlistId: string, symbol: string) => {
+      const sym = symbol.trim().toUpperCase();
+      if (!sym) return;
+      setWatchlists(prev =>
+        prev.map(w => {
+          if (w.id === watchlistId) {
+            if (w.symbols.includes(sym)) return w;
+            return { ...w, symbols: [...w.symbols, sym] };
+          }
+          return w;
+        })
+      );
+      showToast(`Added ${sym} to watchlist`);
+    },
+    [showToast]
+  );
+
+  const removeFromWatchlist = useCallback(
+    (watchlistId: string, symbol: string) => {
+      const sym = symbol.trim().toUpperCase();
+      setWatchlists(prev =>
+        prev.map(w => {
+          if (w.id === watchlistId) {
+            return { ...w, symbols: w.symbols.filter(s => s !== sym) };
+          }
+          return w;
+        })
+      );
+      showToast(`Removed ${sym} from watchlist`);
+    },
+    [showToast]
+  );
+
+  const toggleWatchlistSymbol = useCallback((watchlistId: string, symbol: string) => {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) return;
+    setWatchlists(prev =>
+      prev.map(w => {
+        if (w.id === watchlistId) {
+          const exists = w.symbols.includes(sym);
+          return {
+            ...w,
+            symbols: exists ? w.symbols.filter(s => s !== sym) : [...w.symbols, sym],
+          };
+        }
+        return w;
+      })
+    );
+  }, []);
+
 
   const triggerScan = useCallback(
     async (force: boolean = false, thresholdOverride?: number) => {
@@ -451,6 +699,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sidebarSearch,
       setSidebarSearch,
 
+      // Watchlists
+      watchlists,
+      activeWatchlistId,
+      setActiveWatchlistId,
+      createWatchlist,
+      deleteWatchlist,
+      renameWatchlist,
+      addToWatchlist,
+      removeFromWatchlist,
+      toggleWatchlistSymbol,
+
+      // Journal Stocks
+      journalStocks,
+      refreshJournalStocks,
+
+      // Panel Dimensions
+      sidebarWidth,
+      setSidebarWidth,
+      drawerWidth,
+      setDrawerWidth,
+
       gridScope,
       setGridScope,
       gridSearch,
@@ -538,6 +807,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSidebarTab,
       sidebarSearch,
       setSidebarSearch,
+      watchlists,
+      activeWatchlistId,
+      setActiveWatchlistId,
+      createWatchlist,
+      deleteWatchlist,
+      renameWatchlist,
+      addToWatchlist,
+      removeFromWatchlist,
+      toggleWatchlistSymbol,
+      journalStocks,
+      refreshJournalStocks,
+      sidebarWidth,
+      setSidebarWidth,
+      drawerWidth,
+      setDrawerWidth,
       gridScope,
       setGridScope,
       gridSearch,

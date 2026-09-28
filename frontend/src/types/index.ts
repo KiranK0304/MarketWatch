@@ -1,11 +1,19 @@
 export type Timeframe = '5m' | '15m' | '30m' | '1h' | '1d' | '1w';
 export type ViewMode = 'single' | 'grid';
 export type GridScope = 'universe' | 'movers';
-export type SidebarTab = 'universe' | 'movers';
+export type SidebarTab = 'universe' | 'movers' | 'journal' | 'watchlist';
 export type DrawerTab = 'ai' | 'journal' | 'fundamentals' | 'system';
 export type NoteStatus = 'open' | 'validated' | 'invalidated' | 'cancelled';
 export type JournalFilterScope = 'stock' | 'all';
 export type JournalFilterStatus = 'all' | 'open' | 'validated' | 'invalidated';
+
+/// A user-created watchlist stored in localStorage.
+export interface Watchlist {
+  id: string;
+  name: string;
+  symbols: string[];
+  createdAt: number;
+}
 
 export interface Stock {
   symbol: string;
