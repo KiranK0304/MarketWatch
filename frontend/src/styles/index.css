@@ -154,36 +154,51 @@
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
-      transition: width 0.2s ease;
       z-index: 20;
+      position: relative;
+    }
+
+    .sidebar-resize-handle {
+      position: absolute;
+      top: 0;
+      right: -3px;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 30;
+      transition: background 0.15s ease;
+    }
+    .sidebar-resize-handle:hover,
+    .sidebar-resize-handle:active {
+      background: var(--accent);
     }
 
     .sidebar.collapsed {
-      width: 0;
+      width: 0 !important;
       overflow: hidden;
       border-right: none;
     }
 
     .sidebar-header {
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .sidebar-tabs {
       display: flex;
       background: var(--bg-subtle);
-      padding: 3px;
+      padding: 2px;
       border-radius: 7px;
-      gap: 3px;
+      gap: 2px;
     }
 
     .sidebar-tab-btn, .tab-btn {
       flex: 1;
-      padding: 6px 8px;
-      font-size: 11px;
+      padding: 5px 3px;
+      font-size: 10.5px;
       font-weight: 600;
       background: transparent;
       border: none;
@@ -193,8 +208,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 3px;
       transition: all 0.1s ease;
+      white-space: nowrap;
+      min-width: 0;
     }
 
     .sidebar-tab-btn.active, .tab-btn.active {
@@ -204,11 +221,11 @@
     }
 
     .count-pill {
-      font-size: 10px;
+      font-size: 9.5px;
       font-family: var(--font-mono);
       background: var(--bg-hover);
       color: var(--text-secondary);
-      padding: 1px 5px;
+      padding: 0 4px;
       border-radius: 4px;
       font-weight: 600;
     }
@@ -920,12 +937,27 @@
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
-      transition: width 0.2s ease;
       z-index: 20;
+      position: relative;
+    }
+
+    .drawer-resize-handle {
+      position: absolute;
+      top: 0;
+      left: -3px;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 30;
+      transition: background 0.15s ease;
+    }
+    .drawer-resize-handle:hover,
+    .drawer-resize-handle:active {
+      background: var(--accent);
     }
 
     .intel-drawer.collapsed {
-      width: 0;
+      width: 0 !important;
       overflow: hidden;
       border-left: none;
     }
@@ -1109,7 +1141,38 @@
       color: white;
     }
 
-    /* Note Modal (Log / Edit / Audit) */
+    /* Note Writing Side Panel (Docked Right, Resizable & Expandable, Leaves Chart Visible) */
+    .note-side-panel {
+      position: fixed;
+      top: 48px;
+      right: 0;
+      bottom: 24px;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border);
+      box-shadow: -6px 0 24px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      z-index: 60;
+      min-width: 340px;
+      max-width: 85vw;
+    }
+
+    .note-panel-resizer {
+      position: absolute;
+      top: 0;
+      left: -4px;
+      width: 8px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 65;
+      transition: background 0.15s ease;
+    }
+    .note-panel-resizer:hover,
+    .note-panel-resizer:active {
+      background: var(--accent);
+    }
+
+    /* Note Modal (Audit Dialog) */
     .note-modal {
       background: var(--bg-surface);
       border: 1px solid var(--border);
