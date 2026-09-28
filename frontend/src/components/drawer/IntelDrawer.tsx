@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AiInsightsTab } from './AiInsightsTab';
 import { JournalTab } from './JournalTab';
@@ -7,7 +7,7 @@ import { SystemLogsTab } from './SystemLogsTab';
 import type { DrawerTab } from '../../types';
 
 export const IntelDrawer: React.FC = () => {
-  const { isDrawerOpen, toggleDrawer, drawerTab, setDrawerTab } = useApp();
+  const { isDrawerOpen, toggleDrawer, drawerTab, setDrawerTab, drawerWidth, setDrawerWidth } = useApp();
 
   const tabs: { key: DrawerTab; label: string }[] = [
     { key: 'ai', label: '🧠 AI Insights' },
@@ -16,8 +16,53 @@ export const IntelDrawer: React.FC = () => {
     { key: 'system', label: '⚙️ System & Logs' },
   ];
 
+  // Drag resizer for drawer width (expands to the left)
+  const startResizing = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = drawerWidth;
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        // As mouse moves left (smaller clientX), drawer width increases
+        const delta = startX - moveEvent.clientX;
+        const newWidth = Math.max(260, Math.min(750, startWidth + delta));
+        setDrawerWidth(newWidth);
+      };
+
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    },
+    [drawerWidth, setDrawerWidth]
+  );
+
   return (
-    <aside className={`intel-drawer ${isDrawerOpen ? '' : 'collapsed'}`} id="intel-drawer">
+    <aside
+      className={`intel-drawer ${isDrawerOpen ? '' : 'collapsed'}`}
+      id="intel-drawer"
+      style={{
+        width: isDrawerOpen ? `${drawerWidth}px` : 0,
+        position: 'relative',
+      }}
+    >
+      {/* Resizer Handle on the left border */}
+      {isDrawerOpen && (
+        <div
+          className="drawer-resize-handle"
+          onMouseDown={startResizing}
+          title="Drag to resize intel panel"
+        />
+      )}
+
       <div className="drawer-header">
         <div className="drawer-nav-tabs">
           {tabs.map(t => (

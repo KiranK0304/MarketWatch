@@ -15,6 +15,8 @@ export const JournalTab: React.FC = () => {
     openAuditModal,
     showToast,
     forceRefreshCounter,
+    triggerForceRefresh,
+    refreshJournalStocks,
   } = useApp();
 
   const [notes, setNotes] = useState<StockNote[]>([]);
@@ -49,6 +51,8 @@ export const JournalTab: React.FC = () => {
     try {
       await api.deleteNote(id);
       showToast(`Note #${id} deleted`);
+      triggerForceRefresh();
+      await refreshJournalStocks();
       await fetchNotes();
     } catch (err: any) {
       showToast(`Failed to delete note: ${err.message}`);
