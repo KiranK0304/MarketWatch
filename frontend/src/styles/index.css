@@ -148,7 +148,6 @@
 
     /* 2. Collapsible Watchlist / Screener Sidebar */
     .sidebar {
-      width: 300px;
       background: var(--bg-surface);
       border-right: 1px solid var(--border);
       display: flex;
@@ -156,21 +155,44 @@
       flex-shrink: 0;
       z-index: 20;
       position: relative;
+      min-width: 200px;
+      max-width: 650px;
     }
 
     .sidebar-resize-handle {
       position: absolute;
       top: 0;
-      right: -3px;
-      width: 6px;
+      right: -5px;
+      width: 10px;
       height: 100%;
       cursor: col-resize;
-      z-index: 30;
+      z-index: 40;
+      background: transparent;
+    }
+    .sidebar-resize-handle::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 4px;
+      width: 2px;
+      height: 100%;
+      background: transparent;
       transition: background 0.15s ease;
     }
-    .sidebar-resize-handle:hover,
-    .sidebar-resize-handle:active {
+    .sidebar-resize-handle:hover::after,
+    .sidebar-resize-handle.active::after {
       background: var(--accent);
+    }
+
+    .resizer-drag-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 99999;
+      cursor: col-resize;
+      user-select: none;
     }
 
     .sidebar.collapsed {
@@ -931,7 +953,6 @@
 
     /* 4. Collapsible Right Drawer: Intelligence, Fundamentals & AI */
     .intel-drawer {
-      width: 380px;
       background: var(--bg-surface);
       border-left: 1px solid var(--border);
       display: flex;
@@ -939,20 +960,32 @@
       flex-shrink: 0;
       z-index: 20;
       position: relative;
+      min-width: 270px;
+      max-width: 800px;
     }
 
     .drawer-resize-handle {
       position: absolute;
       top: 0;
-      left: -3px;
-      width: 6px;
+      left: -5px;
+      width: 10px;
       height: 100%;
       cursor: col-resize;
-      z-index: 30;
+      z-index: 40;
+      background: transparent;
+    }
+    .drawer-resize-handle::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 4px;
+      width: 2px;
+      height: 100%;
+      background: transparent;
       transition: background 0.15s ease;
     }
-    .drawer-resize-handle:hover,
-    .drawer-resize-handle:active {
+    .drawer-resize-handle:hover::after,
+    .drawer-resize-handle.active::after {
       background: var(--accent);
     }
 
@@ -963,23 +996,32 @@
     }
 
     .drawer-header {
-      padding: 10px 14px;
+      padding: 8px 10px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 6px;
+      min-width: 0;
     }
 
     .drawer-nav-tabs {
       display: flex;
-      gap: 4px;
+      gap: 3px;
       background: var(--bg-subtle);
       padding: 2px;
       border-radius: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex: 1;
+      min-width: 0;
+    }
+    .drawer-nav-tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .drawer-tab {
-      padding: 4px 8px;
+      padding: 4px 6px;
       font-size: 11px;
       font-weight: 600;
       border: none;
@@ -987,6 +1029,11 @@
       color: var(--text-secondary);
       border-radius: 4px;
       cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 3px;
     }
 
     .drawer-tab.active {
