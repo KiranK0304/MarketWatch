@@ -32,6 +32,7 @@ export const NoteModal: React.FC = () => {
     return Number.isFinite(parsed) && parsed >= 350 && parsed <= 900 ? parsed : 460;
   });
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   useEffect(() => {
     localStorage.setItem('mw_note_panel_width', String(panelWidth));
@@ -48,20 +49,19 @@ export const NoteModal: React.FC = () => {
     }
   }, [isExpanded]);
 
-  // Drag resizer for the left edge of the side panel
+  // Direct cursor tracking for the left edge of the side panel
   const startResizing = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = panelWidth;
+      setIsDragging(true);
 
       const onMouseMove = (moveEvent: MouseEvent) => {
-        const delta = startX - moveEvent.clientX;
-        const newWidth = Math.max(350, Math.min(900, startWidth + delta));
+        const newWidth = Math.max(350, Math.min(950, window.innerWidth - moveEvent.clientX));
         setPanelWidth(newWidth);
       };
 
       const onMouseUp = () => {
+        setIsDragging(false);
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
         document.body.style.cursor = '';
@@ -73,7 +73,7 @@ export const NoteModal: React.FC = () => {
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
     },
-    [panelWidth]
+    []
   );
 
   // Initialize form when opening or editingNote changes
@@ -190,20 +190,24 @@ export const NoteModal: React.FC = () => {
   };
 
   return (
-    <aside
-      className="note-side-panel"
-      id="note-side-panel"
-      style={{ width: `${panelWidth}px` }}
-    >
-      {/* Draggable left edge resizer */}
-      <div
-        className="note-panel-resizer"
-        onMouseDown={startResizing}
-        title="Drag to resize note panel"
-      />
+    <>
+      {/* Full-screen drag overlay to prevent canvas / text from stealing mouse events */}
+      {isDragging && <div className="resizer-drag-overlay" />}
 
-      {/* Header */}
-      <div className="note-modal-header">
+      <aside
+        className="note-side-panel"
+        id="note-side-panel"
+        style={{ width: `${panelWidth}px` }}
+      >
+        {/* Draggable left edge resizer */}
+        <div
+          className={`note-panel-resizer ${isDragging ? 'active' : ''}`}
+          onMouseDown={startResizing}
+          title="Drag to resize note panel"
+        />
+
+        {/* Header */}
+        <div className="note-modal-header">
         <div className="note-modal-title-row">
           <span className="note-modal-icon">📝</span>
           <span className="note-modal-title">
@@ -349,5 +353,6 @@ export const NoteModal: React.FC = () => {
         </div>
       </form>
     </aside>
+    </>
   );
 };
