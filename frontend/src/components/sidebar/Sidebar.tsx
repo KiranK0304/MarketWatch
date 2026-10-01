@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 
 export const Sidebar: React.FC = React.memo(() => {
@@ -37,7 +37,9 @@ export const Sidebar: React.FC = React.memo(() => {
   } = useApp();
 
   const sidebarRef = useRef<HTMLElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Add stock inputs (Universe)
   const [newSym, setNewSym] = useState('');
@@ -50,6 +52,18 @@ export const Sidebar: React.FC = React.memo(() => {
   const [newWlStockSym, setNewWlStockSym] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+
+  // Close hamburger menu on outside click
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, [isMenuOpen]);
 
   // Map symbol to its index in the original universe for O(1) lookups
   const stockIndexMap = useMemo(() => {
@@ -135,6 +149,7 @@ export const Sidebar: React.FC = React.memo(() => {
     setIsCreatingWatchlist(false);
     setSidebarTab('watchlist');
     setGridPage(1);
+    setIsMenuOpen(false);
   };
 
   const handleAddStockToWatchlist = (e: React.FormEvent) => {
@@ -154,6 +169,7 @@ export const Sidebar: React.FC = React.memo(() => {
     if (!activeWatchlistId || !renameValue.trim()) return;
     renameWatchlist(activeWatchlistId, renameValue.trim());
     setIsRenaming(false);
+    setIsMenuOpen(false);
   };
 
   // Dropdown selector value: universe | movers | journal | wl_<id>
@@ -230,8 +246,8 @@ export const Sidebar: React.FC = React.memo(() => {
 
         {/* Sidebar Header */}
         <div className="sidebar-header">
-          {/* Row 1: Primary Dropdown Selector (Can pick ANY view or watchlist; never squishes) */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {/* Row 1: Primary Dropdown Selector + Hamburger / Actions Button */}
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             {isRenaming ? (
               <form onSubmit={handleRenameSubmit} style={{ display: 'flex', gap: '4px', flex: 1, minWidth: 0 }}>
                 <input
@@ -288,51 +304,231 @@ export const Sidebar: React.FC = React.memo(() => {
                   <option value="__create__">➕ Create New Watchlist...</option>
                 </select>
 
+                {/* Hamburger / All Options Popover Button (Always accessible regardless of sidebar width) */}
                 <button
                   type="button"
-                  className="top-action-btn active"
-                  style={{ padding: '3px 8px', fontSize: '11px', flexShrink: 0 }}
-                  title="Create new custom watchlist"
-                  onClick={() => {
-                    setSidebarTab('watchlist');
-                    setIsCreatingWatchlist(prev => !prev);
+                  className={`top-action-btn ${isMenuOpen ? 'active' : ''}`}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '13px',
+                    lineHeight: 1,
+                    flexShrink: 0,
                   }}
+                  title="All Options & Watchlists Menu"
+                  onClick={() => setIsMenuOpen(prev => !prev)}
                 >
-                  + New
+                  ☰
                 </button>
 
-                {sidebarTab === 'watchlist' && currentWatchlist && (
+                {/* Inline Action Buttons (Shown when sidebar is wide enough: >= 290px) */}
+                {sidebarWidth >= 290 && (
                   <>
                     <button
                       type="button"
-                      className="top-action-btn"
-                      style={{ padding: '3px 6px', fontSize: '11px', flexShrink: 0 }}
-                      title="Rename this watchlist"
+                      className="top-action-btn active"
+                      style={{ padding: '3px 8px', fontSize: '11px', flexShrink: 0 }}
+                      title="Create new custom watchlist"
                       onClick={() => {
-                        setRenameValue(currentWatchlist.name);
-                        setIsRenaming(true);
+                        setSidebarTab('watchlist');
+                        setIsCreatingWatchlist(prev => !prev);
                       }}
                     >
-                      ✏️
+                      + New
                     </button>
-                    <button
-                      type="button"
-                      className="top-action-btn"
-                      style={{ padding: '3px 6px', fontSize: '11px', color: 'var(--bearish)', flexShrink: 0 }}
-                      title="Delete this watchlist"
-                      onClick={() => {
-                        if (window.confirm(`Delete watchlist "${currentWatchlist.name}"?`)) {
-                          deleteWatchlist(currentWatchlist.id);
-                        }
-                      }}
-                    >
-                      🗑️
-                    </button>
+
+                    {sidebarTab === 'watchlist' && currentWatchlist && (
+                      <>
+                        <button
+                          type="button"
+                          className="top-action-btn"
+                          style={{ padding: '3px 6px', fontSize: '11px', flexShrink: 0 }}
+                          title="Rename this watchlist"
+                          onClick={() => {
+                            setRenameValue(currentWatchlist.name);
+                            setIsRenaming(true);
+                          }}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          className="top-action-btn"
+                          style={{ padding: '3px 6px', fontSize: '11px', color: 'var(--bearish)', flexShrink: 0 }}
+                          title="Delete this watchlist"
+                          onClick={() => {
+                            if (window.confirm(`Delete watchlist "${currentWatchlist.name}"?`)) {
+                              deleteWatchlist(currentWatchlist.id);
+                            }
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
               </>
             )}
           </div>
+
+          {/* Hamburger Dropdown / Popover Menu (Shows ALL available options when contracted or clicked) */}
+          {isMenuOpen && (
+            <div ref={menuRef} className="sidebar-menu-popover">
+              <div className="sidebar-menu-section">
+                <div className="sidebar-menu-title">Views</div>
+                <button
+                  type="button"
+                  className={`sidebar-menu-item ${sidebarTab === 'universe' ? 'active' : ''}`}
+                  onClick={() => {
+                    setSidebarTab('universe');
+                    setGridPage(1);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <span>🌐 All Universe</span>
+                  <span className="count-pill">{stocks.length}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`sidebar-menu-item ${sidebarTab === 'movers' ? 'active' : ''}`}
+                  onClick={() => {
+                    setSidebarTab('movers');
+                    setGridPage(1);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <span>⚡ Top Movers</span>
+                  <span className="count-pill">{filteredMovers.length}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`sidebar-menu-item ${sidebarTab === 'journal' ? 'active' : ''}`}
+                  onClick={() => {
+                    setSidebarTab('journal');
+                    setGridPage(1);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <span>📝 Analysis Journal</span>
+                  <span className="count-pill">{journalStocks.length}</span>
+                </button>
+              </div>
+
+              <div className="sidebar-menu-divider" />
+
+              <div className="sidebar-menu-section">
+                <div className="sidebar-menu-title">
+                  <span>Watchlists</span>
+                  <button
+                    type="button"
+                    className="top-action-btn active"
+                    style={{ fontSize: '10px', padding: '1px 6px' }}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setSidebarTab('watchlist');
+                      setIsCreatingWatchlist(true);
+                    }}
+                  >
+                    + New
+                  </button>
+                </div>
+
+                {watchlists.length === 0 ? (
+                  <div style={{ padding: '6px 8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    No watchlists created yet.
+                  </div>
+                ) : (
+                  watchlists.map(w => {
+                    const isSelected = sidebarTab === 'watchlist' && activeWatchlistId === w.id;
+                    return (
+                      <div
+                        key={w.id}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}
+                      >
+                        <button
+                          type="button"
+                          className={`sidebar-menu-item ${isSelected ? 'active' : ''}`}
+                          style={{ flex: 1, minWidth: 0 }}
+                          onClick={() => {
+                            setActiveWatchlistId(w.id);
+                            setSidebarTab('watchlist');
+                            setGridPage(1);
+                            setIsMenuOpen(false);
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            ⭐ {w.name}
+                          </span>
+                          <span className="count-pill">{w.symbols.length}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="top-action-btn"
+                          style={{ padding: '2px 5px', fontSize: '10px' }}
+                          title="Rename"
+                          onClick={() => {
+                            setActiveWatchlistId(w.id);
+                            setRenameValue(w.name);
+                            setIsRenaming(true);
+                            setIsMenuOpen(false);
+                          }}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          className="top-action-btn"
+                          style={{ padding: '2px 5px', fontSize: '10px', color: 'var(--bearish)' }}
+                          title="Delete"
+                          onClick={() => {
+                            if (window.confirm(`Delete watchlist "${w.name}"?`)) {
+                              deleteWatchlist(w.id);
+                            }
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="sidebar-menu-divider" />
+
+              {/* Movers Quick Controls within the popover */}
+              <div className="sidebar-menu-section">
+                <div className="sidebar-menu-title">Movers Threshold</div>
+                <div style={{ display: 'flex', gap: '4px', padding: '2px 6px' }}>
+                  {[1.0, 2.0, 3.0].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`tf-btn ${moversThreshold === val ? 'active' : ''}`}
+                      style={{ flex: 1, fontSize: '10px', padding: '4px 0', textAlign: 'center' }}
+                      onClick={() => {
+                        setMoversThreshold(val);
+                        triggerScan(false, val);
+                      }}
+                    >
+                      {val === 3.0 ? '3%+' : `${val}%`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="top-action-btn active"
+                    style={{ fontSize: '10px', padding: '2px 8px' }}
+                    onClick={() => {
+                      triggerScan(true);
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    ⚡ Scan
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Inline New Watchlist Input if toggled */}
           {isCreatingWatchlist && (
@@ -361,53 +557,55 @@ export const Sidebar: React.FC = React.memo(() => {
             </form>
           )}
 
-          {/* Row 2: Compact Quick Tabs (Always readable, fit any width) */}
-          <div className="sidebar-tabs" style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
-            <button
-              className={`tab-btn ${sidebarTab === 'universe' ? 'active' : ''}`}
-              onClick={() => {
-                setSidebarTab('universe');
-                setGridPage(1);
-              }}
-              title="Full Stock Universe"
-            >
-              <span>Univ</span>
-              <span className="count-pill">{stocks.length}</span>
-            </button>
-            <button
-              className={`tab-btn ${sidebarTab === 'movers' ? 'active' : ''}`}
-              onClick={() => {
-                setSidebarTab('movers');
-                setGridPage(1);
-              }}
-              title="Top Market Movers"
-            >
-              <span>Movers</span>
-              <span className="count-pill">{filteredMovers.length}</span>
-            </button>
-            <button
-              className={`tab-btn ${sidebarTab === 'journal' ? 'active' : ''}`}
-              onClick={() => {
-                setSidebarTab('journal');
-                setGridPage(1);
-              }}
-              title="Stocks with Analysis Journal"
-            >
-              <span>Journal</span>
-              <span className="count-pill">{journalStocks.length}</span>
-            </button>
-            <button
-              className={`tab-btn ${sidebarTab === 'watchlist' ? 'active' : ''}`}
-              onClick={() => {
-                setSidebarTab('watchlist');
-                setGridPage(1);
-              }}
-              title="Custom Watchlists"
-            >
-              <span>Lists</span>
-              <span className="count-pill">{watchlists.length}</span>
-            </button>
-          </div>
+          {/* Row 2: Quick Navigation Pills (Shown when width >= 265px, compact & never overflowing) */}
+          {sidebarWidth >= 265 && (
+            <div className="sidebar-tabs" style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
+              <button
+                className={`tab-btn ${sidebarTab === 'universe' ? 'active' : ''}`}
+                onClick={() => {
+                  setSidebarTab('universe');
+                  setGridPage(1);
+                }}
+                title="Full Stock Universe"
+              >
+                <span>Univ</span>
+                <span className="count-pill">{stocks.length}</span>
+              </button>
+              <button
+                className={`tab-btn ${sidebarTab === 'movers' ? 'active' : ''}`}
+                onClick={() => {
+                  setSidebarTab('movers');
+                  setGridPage(1);
+                }}
+                title="Top Market Movers"
+              >
+                <span>Movers</span>
+                <span className="count-pill">{filteredMovers.length}</span>
+              </button>
+              <button
+                className={`tab-btn ${sidebarTab === 'journal' ? 'active' : ''}`}
+                onClick={() => {
+                  setSidebarTab('journal');
+                  setGridPage(1);
+                }}
+                title="Stocks with Analysis Journal"
+              >
+                <span>Journal</span>
+                <span className="count-pill">{journalStocks.length}</span>
+              </button>
+              <button
+                className={`tab-btn ${sidebarTab === 'watchlist' ? 'active' : ''}`}
+                onClick={() => {
+                  setSidebarTab('watchlist');
+                  setGridPage(1);
+                }}
+                title="Custom Watchlists"
+              >
+                <span>Lists</span>
+                <span className="count-pill">{watchlists.length}</span>
+              </button>
+            </div>
+          )}
 
           {/* Search Bar */}
           <div className="search-wrap">
@@ -449,7 +647,7 @@ export const Sidebar: React.FC = React.memo(() => {
           {/* Movers Filter Controls (Movers Tab only) */}
           {sidebarTab === 'movers' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                 <div className="timeframe-group" style={{ height: '24px' }}>
                   {[
                     { value: 1.0, label: '1%' },
@@ -478,13 +676,13 @@ export const Sidebar: React.FC = React.memo(() => {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {(['all', 'gainers', 'losers'] as const).map(f => (
                   <button
                     key={f}
                     className={`filter-pill ${moversFilter === f ? 'active' : ''}`}
                     onClick={() => setMoversFilter(f)}
-                    style={{ textTransform: 'capitalize' }}
+                    style={{ textTransform: 'capitalize', fontSize: '10px', padding: '2px 6px' }}
                   >
                     {f === 'gainers' ? 'Gainers 🟢' : f === 'losers' ? 'Losers 🔴' : 'All'}
                   </button>
