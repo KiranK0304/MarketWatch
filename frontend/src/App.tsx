@@ -6,6 +6,7 @@ import { Sidebar } from './components/sidebar/Sidebar';
 import { TopBar } from './components/topbar/TopBar';
 import { FocusChart } from './components/chart/FocusChart';
 import { MultiChartGrid } from './components/grid/MultiChartGrid';
+import { JournalStudio } from './components/journal/JournalStudio';
 import { IntelDrawer } from './components/drawer/IntelDrawer';
 import { StatusStrip } from './components/layout/StatusStrip';
 import { NoteModal } from './components/modals/NoteModal';
@@ -37,11 +38,13 @@ export const App: React.FC = () => {
         <div className="viewport-area">
           {viewMode === 'single' ? (
             <FocusChart onPriceUpdate={handlePriceUpdate} />
-          ) : (
+          ) : viewMode === 'grid' ? (
             <MultiChartGrid />
+          ) : (
+            <JournalStudio onPriceUpdate={handlePriceUpdate} />
           )}
 
-          <IntelDrawer />
+          {viewMode !== 'journal' && <IntelDrawer />}
         </div>
 
         <StatusStrip />

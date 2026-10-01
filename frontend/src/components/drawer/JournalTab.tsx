@@ -17,6 +17,8 @@ export const JournalTab: React.FC = () => {
     forceRefreshCounter,
     triggerForceRefresh,
     refreshJournalStocks,
+    selectedJournalNote,
+    setSelectedJournalNote,
   } = useApp();
 
   const [notes, setNotes] = useState<StockNote[]>([]);
@@ -181,18 +183,40 @@ export const JournalTab: React.FC = () => {
 
             const isVal = note.status === 'validated';
             const isInv = note.status === 'invalidated';
+            const isSelected = selectedJournalNote?.id === note.id;
             const borderColor = isVal ? 'var(--bullish)' : isInv ? 'var(--bearish)' : 'var(--accent)';
             const statusLabel = isVal ? 'Validated ✅' : isInv ? 'Invalidated ❌' : 'Outcome Review';
 
+            let rrStr = '';
+            if (note.target_price && note.stop_loss && note.price_at_note > 0) {
+              const rew = Math.abs(note.target_price - note.price_at_note);
+              const rsk = Math.abs(note.price_at_note - note.stop_loss);
+              if (rsk > 0) rrStr = ` • R:R ${(rew / rsk).toFixed(2)}`;
+            }
+
             return (
-              <div key={note.id} className="journal-card" id={`note-card-${note.id}`}>
+              <div
+                key={note.id}
+                className={`journal-card ${isSelected ? 'selected' : ''}`}
+                id={`note-card-${note.id}`}
+                onClick={() => {
+                  if (note.symbol !== activeStock?.symbol) {
+                    selectStock(note.symbol);
+                  }
+                  setSelectedJournalNote(note);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 {/* Card Top: Symbol, Timeframe, Status, Date */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <a
                       className="journal-stock-link"
                       style={{ fontWeight: 700, fontSize: '12px', color: 'var(--accent)', cursor: 'pointer', textDecoration: 'none' }}
-                      onClick={() => selectStock(note.symbol)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        selectStock(note.symbol);
+                      }}
                     >
                       {note.symbol}
                     </a>
@@ -225,9 +249,10 @@ export const JournalTab: React.FC = () => {
 
                 {/* Target & Stop Loss */}
                 {(note.target_price || note.stop_loss) && (
-                  <div style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '2px', alignItems: 'center' }}>
                     {note.target_price && <span style={{ color: 'var(--bullish)' }}>🎯 Target: ₹{note.target_price.toFixed(2)}</span>}
                     {note.stop_loss && <span style={{ color: 'var(--bearish)' }}>🛑 SL: ₹{note.stop_loss.toFixed(2)}</span>}
+                    {rrStr && <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{rrStr}</span>}
                   </div>
                 )}
 

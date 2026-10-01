@@ -1676,3 +1676,420 @@
       pointer-events: none;
     }
     .toast.show { opacity: 1; }
+
+/* ==========================================================================
+   TRADE JOURNAL STUDIO (Split-screen Scalable Trading Workspace)
+   ========================================================================== */
+.journal-studio-container {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-main);
+}
+
+.journal-studio-chart-pane {
+  flex: 1 1 50%;
+  min-width: 360px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  position: relative;
+  background: var(--bg-main);
+}
+
+.journal-studio-active-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  z-index: 5;
+}
+
+.journal-studio-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse-dot 1.8s infinite;
+  flex-shrink: 0;
+}
+
+.journal-studio-chart-wrapper {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.journal-studio-desk-pane {
+  flex: 1 1 50%;
+  min-width: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  padding: 16px 20px;
+  gap: 14px;
+}
+
+.journal-studio-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journal-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.journal-stat-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.journal-stat-card .stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.journal-stat-card .stat-val {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.journal-inline-creator {
+  background: var(--bg-subtle);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: var(--shadow-md);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.journal-input, .journal-textarea {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.journal-input:focus, .journal-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.journal-field-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.journal-rr-preview {
+  background: var(--bg-hover);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.journal-tag-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.journal-tag-chip:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.journal-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journal-scope-toggle {
+  display: flex;
+  background: var(--bg-subtle);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  gap: 4px;
+}
+
+.scope-pill {
+  flex: 1;
+  padding: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.scope-pill.active {
+  background: var(--accent);
+  color: white;
+}
+
+.journal-status-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.status-pill-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.status-pill-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.status-pill-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.journal-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.journal-search-input {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 28px 6px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.journal-search-input:focus {
+  border-color: var(--accent);
+}
+
+.journal-search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.journal-notes-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.journal-empty-desk {
+  text-align: center;
+  padding: 48px 16px;
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.journal-trade-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.journal-trade-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+.journal-trade-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--accent);
+  background: var(--bg-hover);
+}
+
+.trade-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trade-card-sym {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.trade-card-tf {
+  font-size: 10px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+
+.trade-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.trade-card-dual-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .trade-card-dual-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trade-card-layer-trader {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.trade-card-layer-quant {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.layer-badge {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.layer-badge.quant {
+  color: var(--accent);
+}
+
+.trade-card-content {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.trade-tag-pill {
+  font-size: 10px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.quant-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.quant-metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.quant-metric-item .m-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.quant-metric-item .m-val {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.quant-outcome-banner {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.trade-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
