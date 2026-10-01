@@ -19,6 +19,7 @@ export function useKeyboardShortcuts() {
     openCommandPalette,
     closeCommandPalette,
     toggleDrawer,
+    toggleSidebar,
     viewMode,
     setViewMode,
     toggleTheme,
@@ -100,6 +101,10 @@ export function useKeyboardShortcuts() {
         case 'i':
           e.preventDefault();
           toggleDrawer();
+          break;
+        case 'b':
+          e.preventDefault();
+          toggleSidebar();
           break;
         case 'g':
           e.preventDefault();

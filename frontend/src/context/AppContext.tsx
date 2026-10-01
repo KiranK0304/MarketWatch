@@ -65,7 +65,10 @@ interface AppContextValue {
   journalStocks: Stock[];
   refreshJournalStocks: () => Promise<void>;
 
-  // Sidebar panel width (resizable)
+  // Sidebar panel open state & width
+  isSidebarOpen: boolean;
+  toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
   sidebarWidth: number;
   setSidebarWidth: (w: number) => void;
   drawerWidth: number;
@@ -189,6 +192,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Journal Stocks (auto-populated from notes API)
   const [journalStocks, setJournalStocks] = useState<Stock[]>([]);
   const journalFetchGeneration = useRef(0);
+
+  // Sidebar panel open state (persisted in localStorage)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mw_sidebar_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mw_sidebar_open', String(isSidebarOpen));
+  }, [isSidebarOpen]);
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen(prev => !prev);
+  }, []);
 
   // Resizable panel widths (persisted in localStorage)
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -720,6 +737,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshJournalStocks,
 
       // Panel Dimensions
+      isSidebarOpen,
+      toggleSidebar,
+      setSidebarOpen: setIsSidebarOpen,
       sidebarWidth,
       setSidebarWidth,
       drawerWidth,
@@ -826,6 +846,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleWatchlistSymbol,
       journalStocks,
       refreshJournalStocks,
+      isSidebarOpen,
+      toggleSidebar,
       sidebarWidth,
       setSidebarWidth,
       drawerWidth,

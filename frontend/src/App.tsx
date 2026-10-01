@@ -17,7 +17,7 @@ import { Toast } from './components/common/Toast';
 
 export const App: React.FC = () => {
   useKeyboardShortcuts();
-  const { viewMode } = useApp();
+  const { viewMode, isSidebarOpen, toggleSidebar, isDrawerOpen, toggleDrawer } = useApp();
 
   const [heroPrice, setHeroPrice] = useState('₹--');
   const [heroChange, setHeroChange] = useState({ text: '--', isPositive: true });
@@ -36,6 +36,18 @@ export const App: React.FC = () => {
         <TopBar heroPrice={heroPrice} heroChange={heroChange} />
 
         <div className="viewport-area">
+          {!isSidebarOpen && (
+            <button
+              type="button"
+              className="panel-edge-tab left"
+              id="btn-open-sidebar-floating"
+              onClick={toggleSidebar}
+              title="Open Left Sidebar (B)"
+            >
+              ▶
+            </button>
+          )}
+
           {viewMode === 'single' ? (
             <FocusChart onPriceUpdate={handlePriceUpdate} />
           ) : viewMode === 'grid' ? (
@@ -45,6 +57,18 @@ export const App: React.FC = () => {
           )}
 
           {viewMode !== 'journal' && <IntelDrawer />}
+
+          {viewMode !== 'journal' && !isDrawerOpen && (
+            <button
+              type="button"
+              className="panel-edge-tab right"
+              id="btn-open-drawer-floating"
+              onClick={toggleDrawer}
+              title="Open Intel & AI Drawer (I)"
+            >
+              ◀
+            </button>
+          )}
         </div>
 
         <StatusStrip />

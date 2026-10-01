@@ -61,6 +61,7 @@ export const IntelDrawer: React.FC = () => {
         id="intel-drawer"
         style={{
           width: isDrawerOpen ? `${drawerWidth}px` : 0,
+          minWidth: isDrawerOpen ? undefined : 0,
         }}
       >
         {/* Resizer Handle on the left border */}
@@ -87,14 +88,14 @@ export const IntelDrawer: React.FC = () => {
             ))}
           </div>
           <button
+            type="button"
+            className="top-action-btn"
             style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              fontSize: '14px',
-              padding: '2px 4px',
+              padding: '3px 7px',
+              fontSize: '12px',
               flexShrink: 0,
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
             }}
             id="btn-close-drawer"
             title="Close Drawer (I)"

@@ -197,6 +197,7 @@
 
     .sidebar.collapsed {
       width: 0 !important;
+      min-width: 0 !important;
       overflow: hidden;
       border-right: none;
     }
@@ -1068,8 +1069,47 @@
 
     .intel-drawer.collapsed {
       width: 0 !important;
+      min-width: 0 !important;
       overflow: hidden;
       border-left: none;
+    }
+
+    /* Floating Panel Open Handle Tabs */
+    .panel-edge-tab {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 25;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 5px;
+      font-size: 11px;
+      box-shadow: var(--shadow-md);
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .panel-edge-tab:hover {
+      background: var(--bg-hover);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .panel-edge-tab.left {
+      left: 0;
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .panel-edge-tab.right {
+      right: 0;
+      border-right: none;
+      border-radius: 6px 0 0 6px;
     }
 
     .drawer-header {

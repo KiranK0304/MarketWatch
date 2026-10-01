@@ -31,7 +31,9 @@ export const Sidebar: React.FC = React.memo(() => {
     removeFromWatchlist,
     // Journal Stocks
     journalStocks,
-    // Dimensions
+    // Dimensions & Open state
+    isSidebarOpen,
+    toggleSidebar,
     sidebarWidth,
     setSidebarWidth,
   } = useApp();
@@ -233,16 +235,21 @@ export const Sidebar: React.FC = React.memo(() => {
 
       <aside
         ref={sidebarRef}
-        className="sidebar"
+        className={`sidebar ${isSidebarOpen ? '' : 'collapsed'}`}
         id="sidebar"
-        style={{ width: `${sidebarWidth}px` }}
+        style={{
+          width: isSidebarOpen ? `${sidebarWidth}px` : 0,
+          minWidth: isSidebarOpen ? undefined : 0,
+        }}
       >
         {/* Resizer Handle on right border */}
-        <div
-          className={`sidebar-resize-handle ${isDragging ? 'active' : ''}`}
-          onMouseDown={startResizing}
-          title="Drag to resize sidebar"
-        />
+        {isSidebarOpen && (
+          <div
+            className={`sidebar-resize-handle ${isDragging ? 'active' : ''}`}
+            onMouseDown={startResizing}
+            title="Drag to resize sidebar"
+          />
+        )}
 
         {/* Sidebar Header */}
         <div className="sidebar-header">
@@ -367,6 +374,23 @@ export const Sidebar: React.FC = React.memo(() => {
                     )}
                   </>
                 )}
+
+                {/* Close Left Sidebar Button (✕) */}
+                <button
+                  type="button"
+                  className="top-action-btn"
+                  id="btn-close-sidebar"
+                  style={{
+                    padding: '3px 7px',
+                    fontSize: '12px',
+                    flexShrink: 0,
+                    color: 'var(--text-muted)',
+                  }}
+                  title="Close Sidebar (B)"
+                  onClick={toggleSidebar}
+                >
+                  ✕
+                </button>
               </>
             )}
           </div>

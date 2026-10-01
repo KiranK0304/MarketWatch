@@ -21,6 +21,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({ heroPrice, heroChange
     gridPageSize,
     stocks,
     filteredMovers,
+    isSidebarOpen,
+    toggleSidebar,
     isDrawerOpen,
     toggleDrawer,
     openNoteModal,
@@ -97,6 +99,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({ heroPrice, heroChange
     <header className="top-control-bar">
       {/* 1. Hero Symbol & Price Info */}
       <div className="hero-stock-info">
+        <button
+          type="button"
+          className={`top-action-btn ${isSidebarOpen ? 'active' : ''}`}
+          id="btn-toggle-sidebar-top"
+          title={`${isSidebarOpen ? 'Collapse' : 'Expand'} Left Sidebar (B)`}
+          onClick={toggleSidebar}
+          style={{ padding: '3px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '5px', marginRight: '6px' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M9 3v18" />
+          </svg>
+          <span>{isSidebarOpen ? '◀' : '▶'}</span>
+        </button>
+
         <h1 className="hero-symbol" id="hero-sym">
           {activeStock?.symbol || '--'}
         </h1>

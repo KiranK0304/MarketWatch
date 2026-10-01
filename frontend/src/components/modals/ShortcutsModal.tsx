@@ -12,6 +12,7 @@ export const ShortcutsModal: React.FC = () => {
     { key: 'Space / F', desc: 'Force Sync fresh data from Yahoo Finance' },
     { key: 'N', desc: 'Log Trading Analysis Note for active stock' },
     { key: 'I', desc: 'Toggle Intel & AI Side Drawer' },
+    { key: 'B', desc: 'Toggle Left Sidebar (Universe & Watchlist)' },
     { key: 'G', desc: 'Toggle Single Focus Chart / Multi-Chart Grid' },
     { key: 'V', desc: 'Cycle View Modes (Single / Journal Studio / Grid)' },
     { key: '/', desc: 'Focus Watchlist Search Filter' },
