@@ -105,7 +105,9 @@ interface AppContextValue {
   candles: Candle[];
   setCandles: (candles: Candle[]) => void;
 
-  // Modals
+  // Modals & Selected Journal Note
+  selectedJournalNote: StockNote | null;
+  setSelectedJournalNote: (note: StockNote | null) => void;
   isNoteModalOpen: boolean;
   editingNote: StockNote | null;
   openNoteModal: (note?: StockNote) => void;
@@ -235,6 +237,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLatestPrice(price);
     setLatestCandleTimestamp(ts);
   }, []);
+
+  // Selected Journal Note
+  const [selectedJournalNote, setSelectedJournalNote] = useState<StockNote | null>(null);
 
   // Modals
   const [isNoteModalOpen, setIsNoteModalOpen] = useState<boolean>(false);
@@ -750,6 +755,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       candles,
       setCandles,
 
+      selectedJournalNote,
+      setSelectedJournalNote,
+
       isNoteModalOpen,
       editingNote,
       openNoteModal,
@@ -848,6 +856,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLatestCandleInfo,
       candles,
       setCandles,
+      selectedJournalNote,
       isNoteModalOpen,
       editingNote,
       openNoteModal,
