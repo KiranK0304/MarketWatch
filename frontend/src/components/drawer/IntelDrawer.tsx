@@ -9,6 +9,7 @@ import type { DrawerTab } from '../../types';
 export const IntelDrawer: React.FC = () => {
   const { isDrawerOpen, toggleDrawer, drawerTab, setDrawerTab, drawerWidth, setDrawerWidth } = useApp();
   const [isDragging, setIsDragging] = useState(false);
+  const drawerRef = React.useRef<HTMLElement>(null);
 
   const tabs: { key: DrawerTab; label: string; icon: string }[] = [
     { key: 'ai', label: 'AI', icon: '🧠' },
@@ -24,8 +25,12 @@ export const IntelDrawer: React.FC = () => {
       setIsDragging(true);
 
       const onMouseMove = (moveEvent: MouseEvent) => {
-        // Direct cursor tracking from the right edge of viewport
-        const newWidth = Math.max(270, Math.min(800, window.innerWidth - moveEvent.clientX));
+        // Measure viewport parent width so the drawer never overflows the viewport
+        const viewportArea = drawerRef.current?.parentElement;
+        const availableWidth = viewportArea ? viewportArea.clientWidth : (window.innerWidth - 300);
+        // Leave at least 250px for the chart/grid on the left
+        const maxDrawerWidth = Math.max(260, availableWidth - 250);
+        const newWidth = Math.max(260, Math.min(maxDrawerWidth, window.innerWidth - moveEvent.clientX));
         setDrawerWidth(newWidth);
       };
 
@@ -51,6 +56,7 @@ export const IntelDrawer: React.FC = () => {
       {isDragging && <div className="resizer-drag-overlay" />}
 
       <aside
+        ref={drawerRef}
         className={`intel-drawer ${isDrawerOpen ? '' : 'collapsed'}`}
         id="intel-drawer"
         style={{
