@@ -105,6 +105,10 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           setViewMode(viewMode === 'single' ? 'grid' : 'single');
           break;
+        case 'v':
+          e.preventDefault();
+          setViewMode(viewMode === 'single' ? 'journal' : viewMode === 'journal' ? 'grid' : 'single');
+          break;
         case 't':
           e.preventDefault();
           toggleTheme();

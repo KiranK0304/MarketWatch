@@ -13,6 +13,7 @@ export const ShortcutsModal: React.FC = () => {
     { key: 'N', desc: 'Log Trading Analysis Note for active stock' },
     { key: 'I', desc: 'Toggle Intel & AI Side Drawer' },
     { key: 'G', desc: 'Toggle Single Focus Chart / Multi-Chart Grid' },
+    { key: 'V', desc: 'Cycle View Modes (Single / Journal Studio / Grid)' },
     { key: '/', desc: 'Focus Watchlist Search Filter' },
     { key: 'T', desc: 'Toggle White / Black Theme' },
     { key: '+ / -', desc: 'Zoom In / Out Candlestick Spacing' },
