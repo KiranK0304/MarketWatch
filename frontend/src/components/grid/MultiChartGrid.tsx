@@ -3,6 +3,7 @@ import { createChart, IChartApi, CandlestickData, Time } from 'lightweight-chart
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
 import type { Stock } from '../../types';
+import { calculateDayChange } from '../../utils/price';
 
 interface GridCardProps {
   stock: Stock;
@@ -11,6 +12,7 @@ interface GridCardProps {
 }
 
 const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
+  const { movers } = useApp();
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -94,15 +96,15 @@ const GridCard: React.FC<GridCardProps> = ({ stock, timeframe, onSelect }) => {
         });
         chart.timeScale().fitContent();
 
-        const last = candles[candles.length - 1];
-        const first = candles[0];
-        const chg = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : 0;
-        const isPos = chg >= 0;
+        const quote = movers?.all_quotes?.find(
+          q => q.symbol.toUpperCase() === stock.symbol.toUpperCase()
+        ) || null;
+        const dayChange = calculateDayChange(candles, timeframe, quote);
 
         setPriceInfo({
-          price: `₹${last.close.toFixed(2)}`,
-          chg: `${isPos ? '+' : ''}${chg.toFixed(2)}%`,
-          isPos,
+          price: dayChange.formattedPrice,
+          chg: dayChange.formattedChange,
+          isPos: dayChange.isPositive,
         });
       } catch (_) {
         // ignore

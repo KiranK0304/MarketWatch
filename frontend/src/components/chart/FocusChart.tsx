@@ -3,6 +3,7 @@ import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Tim
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
 import type { Candle, StockNote, Timeframe } from '../../types';
+import { calculateDayChange } from '../../utils/price';
 
 // Timeframe-adaptive chart spacing parameters
 export function getTimeframeChartParams(tf: Timeframe, userZoom: number) {
@@ -57,6 +58,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     isDark,
     zoom,
     showToast,
+    movers,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -234,19 +236,34 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
           candleSeriesRef.current?.setData(formattedCandles);
           volumeSeriesRef.current?.setData(formattedVolumes);
 
-          // Update latest prices
+          // Update latest prices and daily change
           const last = candles[candles.length - 1];
           setLatestCandleInfo(last.close, last.timestamp);
-          const first = candles[0];
-          const totalChg = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : 0;
-          const isPos = totalChg >= 0;
+
+          const activeQuote = activeStock && movers?.all_quotes
+            ? movers.all_quotes.find(q => q.symbol.toUpperCase() === activeStock.symbol.toUpperCase()) || null
+            : null;
+
+          const dayChange = calculateDayChange(candles, timeframe, activeQuote);
 
           if (onPriceUpdate) {
-            onPriceUpdate(`₹${last.close.toFixed(2)}`, {
-              text: `${isPos ? '+' : ''}${totalChg.toFixed(2)}%`,
-              isPositive: isPos,
+            onPriceUpdate(dayChange.formattedPrice, {
+              text: dayChange.formattedChange,
+              isPositive: dayChange.isPositive,
             });
           }
+
+          const lastChg = last.open > 0 ? ((last.close - last.open) / last.open) * 100 : 0;
+          const volStr = last.volume > 1e6 ? `${(last.volume / 1e6).toFixed(2)}M` : `${(last.volume / 1e3).toFixed(0)}K`;
+          setOhlc({
+            open: `₹${last.open.toFixed(2)}`,
+            high: `₹${last.high.toFixed(2)}`,
+            low: `₹${last.low.toFixed(2)}`,
+            close: `₹${last.close.toFixed(2)}`,
+            chg: `${lastChg >= 0 ? '+' : ''}${lastChg.toFixed(2)}%`,
+            vol: volStr,
+            isPositive: lastChg >= 0,
+          });
 
           // Force the price scale to re-auto-scale for the new data range.
           // Top 5% breathing room, bottom 20% reserved for volume overlay.
@@ -292,7 +309,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     return () => {
       isSubscribed = false;
     };
-  }, [activeStock, timeframe, forceRefreshCounter, setCacheLatency, setChartCacheHeader, onPriceUpdate]);
+  }, [activeStock, timeframe, forceRefreshCounter, setCacheLatency, setChartCacheHeader, onPriceUpdate, movers]);
 
   // 3. Fetch Stock Notes and position x-axis indicator dots
   useEffect(() => {

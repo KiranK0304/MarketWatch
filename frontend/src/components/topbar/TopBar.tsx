@@ -33,9 +33,35 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({ heroPrice, heroChange
     journalStocks,
     watchlists,
     activeWatchlistId,
+    movers,
   } = useApp();
 
   const timeframes: Timeframe[] = ['5m', '15m', '30m', '1h', '1d', '1w'];
+
+  // Active stock official quote from scan results (if available)
+  const activeQuote = React.useMemo(() => {
+    if (!activeStock || !movers?.all_quotes) return null;
+    const sym = activeStock.symbol.toUpperCase();
+    return movers.all_quotes.find(q => q.symbol.toUpperCase() === sym) || null;
+  }, [activeStock, movers]);
+
+  const displayPrice = React.useMemo(() => {
+    if (heroPrice && heroPrice !== '₹--') return heroPrice;
+    if (activeQuote) return `₹${activeQuote.price.toFixed(2)}`;
+    return '₹--';
+  }, [heroPrice, activeQuote]);
+
+  const displayChange = React.useMemo(() => {
+    if (heroChange && heroChange.text !== '--') return heroChange;
+    if (activeQuote) {
+      const isPos = activeQuote.change_percent >= 0;
+      return {
+        text: `${isPos ? '+' : ''}${activeQuote.change_percent.toFixed(2)}%`,
+        isPositive: isPos,
+      };
+    }
+    return { text: '--', isPositive: true };
+  }, [heroChange, activeQuote]);
 
   // Grid pagination calculations (reflecting sidebar tab and search)
   const gridItems = React.useMemo(() => {
@@ -75,13 +101,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({ heroPrice, heroChange
           {activeStock?.symbol || '--'}
         </h1>
         <div className="hero-price" id="hero-price">
-          {heroPrice || '₹--'}
+          {displayPrice}
         </div>
         <div
-          className={`hero-change-badge ${heroChange.isPositive ? 'up' : 'down'}`}
+          className={`hero-change-badge ${displayChange.isPositive ? 'up' : 'down'}`}
           id="hero-chg"
         >
-          {heroChange.text || '--'}
+          {displayChange.text}
         </div>
         <div className="hero-meta-divider" />
         <div className="hero-meta-field">
