@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time, IPriceLine, LineStyle } from 'lightweight-charts';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
 import type { Candle, StockNote, Timeframe } from '../../types';
@@ -59,6 +59,7 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
     zoom,
     showToast,
     movers,
+    selectedJournalNote,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -332,6 +333,81 @@ export const FocusChart: React.FC<FocusChartProps> = ({ onPriceUpdate }) => {
       isSubscribed = false;
     };
   }, [activeStock?.symbol, forceRefreshCounter]);
+
+  // Dynamic Price Lines for Selected Journal Note (Target, Stop Loss, Entry)
+  const priceLinesRef = useRef<IPriceLine[]>([]);
+
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+
+    // Clear previous price lines
+    priceLinesRef.current.forEach(pl => {
+      try {
+        series.removePriceLine(pl);
+      } catch (_) {}
+    });
+    priceLinesRef.current = [];
+
+    if (!selectedJournalNote || selectedJournalNote.symbol.toUpperCase() !== activeStock?.symbol.toUpperCase()) {
+      return;
+    }
+
+    const created: IPriceLine[] = [];
+
+    // Target Price Line (Bullish Green Dashed)
+    if (selectedJournalNote.target_price && selectedJournalNote.target_price > 0) {
+      created.push(
+        series.createPriceLine({
+          price: selectedJournalNote.target_price,
+          color: '#22c55e',
+          lineWidth: 2,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `🎯 Target ₹${selectedJournalNote.target_price.toFixed(2)}`,
+        })
+      );
+    }
+
+    // Stop Loss Line (Bearish Red Dashed)
+    if (selectedJournalNote.stop_loss && selectedJournalNote.stop_loss > 0) {
+      created.push(
+        series.createPriceLine({
+          price: selectedJournalNote.stop_loss,
+          color: '#ef4444',
+          lineWidth: 2,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `🛑 SL ₹${selectedJournalNote.stop_loss.toFixed(2)}`,
+        })
+      );
+    }
+
+    // Entry Price Line (Cyan Dotted)
+    if (selectedJournalNote.price_at_note && selectedJournalNote.price_at_note > 0) {
+      created.push(
+        series.createPriceLine({
+          price: selectedJournalNote.price_at_note,
+          color: '#38bdf8',
+          lineWidth: 2,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: `📍 Entry ₹${selectedJournalNote.price_at_note.toFixed(2)}`,
+        })
+      );
+    }
+
+    priceLinesRef.current = created;
+
+    return () => {
+      created.forEach(pl => {
+        try {
+          series.removePriceLine(pl);
+        } catch (_) {}
+      });
+      priceLinesRef.current = [];
+    };
+  }, [selectedJournalNote, activeStock?.symbol, candleData]);
 
   // Canonicalize timeframe string for matching
   const canonicalTimeframe = (tf: string) => {
